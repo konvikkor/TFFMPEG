@@ -55,6 +55,7 @@ type
     CS:TCriticalSection;
     procedure CreateWnd; override;
     procedure DestroyWnd; override;
+    Function CaslcSize(Sourse:TSDL_Rect):TSDL_Rect;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -174,6 +175,25 @@ end;
 
 { TFFMpedDisplay }
 
+function TMyFFMpegDisplay.CaslcSize(Sourse: TSDL_Rect): TSDL_Rect;
+var rect:TSDL_Rect;
+    p:Double;
+begin
+  if not Assigned(FSDLPantalla.Renderer) then Exit;
+  SDL_RenderGetViewport(FSDLPantalla.Renderer,@rect);
+  Result.x := 0;
+  Result.y := 0;
+  p := (rect.w * 100) / Sourse.w;
+  Result.w := round((Sourse.w * p) / 100);
+  Result.h := round((Sourse.h * p) / 100);
+  if Result.h > rect.h then
+  begin
+   p := (rect.h * 100) / Result.h;
+   Result.w := round((Result.w * p) / 100);
+   Result.h := round((Result.h * p) / 100);
+  end;
+end;
+
 constructor TMyFFMpegDisplay.Create(AOwner: TComponent);
 begin
   inherited;
@@ -283,58 +303,47 @@ begin
     Result := False;
     Exit;
   end;
+  // Задаём размеры прямоугольника в дальнейшем по мену будем считать преобразование размера кадра
+  rect.x := 0;
+  rect.y := 0;
+  rect.w := AVStream.codec.width; // шырена
+  rect.h := AVStream.codec.height; // высота
+  rect2:=CaslcSize(rect);
   // Очистка от предыдущий ошибок
   Img := av_frame_alloc(); // Создаём пространство для конвертированного кадра
   ticB:=GetTickCount;
   // получаем контекст для преобразования в RGBы
   ImgConvContext := nil;
   ImgConvContext := sws_getContext(AVStream.codec.width, AVStream.codec.height,
-    AVStream.codec.pix_fmt, AVStream.codec.width, AVStream.codec.height, pix_F, SWS_BILINEAR, nil,
+    AVStream.codec.pix_fmt, rect2.W{AVStream.codec.width}, rect2.h{AVStream.codec.height}, pix_F, SWS_BILINEAR, nil,
     nil, nil);
   // Формируем буфер для картинки RGB
-  Ibmp_Size := avpicture_get_size(pix_F, AVStream.codec.width, AVStream.codec.height);
+  Ibmp_Size := avpicture_get_size(pix_F, rect2.w{AVStream.codec.width}, rect2.H{AVStream.codec.height});
   ibmp_Buff := nil;
   ibmp_Buff := av_malloc(Ibmp_Size * SizeOf(Byte));
-  res := avpicture_fill(PAVPicture(Img), ibmp_Buff, pix_F, AVStream.codec.width,
-    AVFrame.height);
-  // Задаём размеры прямоугольника в дальнейшем по мену будем считать преобразование размера кадра
-  rect.x := 0;
-  rect.y := 0;
-  rect.w := AVStream.codec.width; // шырена
-  rect.h := AVStream.codec.height; // высота
+  res := avpicture_fill(PAVPicture(Img), ibmp_Buff, pix_F, rect2.w{AVStream.codec.width},
+    rect2.h{AVFrame.height});
   // конвертируем формат пикселя в RGB
   if Assigned(ImgConvContext) then
    res := sws_scale(ImgConvContext, @AVFrame.Data, @AVFrame.linesize, 0,
-      AVFrame.height, @Img.Data, @Img.linesize);
+      AVStream.codec.height, @Img.Data, @Img.linesize);
   TicE:=GetTickCount;
   try
     // рисуем картинку на текстуре
-    res := SDL_UpdateTexture(MooseTexture, @rect, @Img.Data[0]^,
+    res := SDL_UpdateTexture(MooseTexture, @rect2, @Img.Data[0]^,
       Img.linesize[0]);
     if res < 0 then
       Result := False;
     // копируем картинку с текстуры в рендер
     if FProportionally then begin
-      SDL_RenderGetViewport(FSDLPantalla.Renderer,@rect3);
-      rect2.x := 0;
-      rect2.y := 0;
-      p := (rect3.w * 100) / rect.w;
-      rect2.w := round((rect.w * p) / 100);
-      rect2.h := round((rect.h * p) / 100);
-      if rect2.h > Self.height then
-      begin
-       p := (rect3.h * 100) / rect2.h;
-       rect2.w := round((rect2.w * p) / 100);
-       rect2.h := round((rect2.h * p) / 100);
-      end;
-      res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture, nil,
-        // С какой области скопировать кадр
+      res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture,
+        nil, // С какой области скопировать кадр
         @rect2 // На какой размер растянуть кадр
         );
     end else begin
-      res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture, nil,
-        // С какой области скопировать кадр
-        nil // На какой размер растянуть кадр
+      res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture,
+        @rect,// С какой области скопировать кадр
+        nil   // На какой размер растянуть кадр
         );
     end;
     if res < 0 then
@@ -357,6 +366,7 @@ begin
   sws_freeContext(ImgConvContext);
   av_frame_free(@Img);
   Application.ProcessMessages;
+  SDL_RenderPresent(FSDLPantalla^.Renderer);
  end;
 end;
 
@@ -377,18 +387,25 @@ begin Result:=True;
 end;
 
 function TMyFFMpegDisplay.DisplayInit(AVStream: PAVStream): Boolean;
+var
+  rect, rect2:TSDL_Rect;
 begin  Result:=True;
  try
+  rect.x := 0;
+  rect.y := 0;
+  rect.w := AVStream.codec.width; // шырена
+  rect.h := AVStream.codec.height; // высота
+  rect2:=CaslcSize(rect);
   if assigned(FSDLPantalla.Window.surface) then begin
    if
-    (FSDLPantalla.Window.surface.w <> AVStream.codec.width) or
-    (FSDLPantalla.Window.surface.h <> AVStream.codec.height) then
+    (FSDLPantalla.Window.surface.w <> rect2.w{AVStream.codec.width}) or
+    (FSDLPantalla.Window.surface.h <> rect2.h{AVStream.codec.height}) then
      DisplayFree;
   end;
   // Создаём текстуру для отображения кадра
   if not assigned(FSDLPantalla.Window.surface) then
-    FSDLPantalla.Window.surface := SDL_CreateRGBSurface(0, AVStream.codec.width,
-      AVStream.codec.height, 24, $000000FF, $0000FF00, $00FF0000, $00000000);
+    FSDLPantalla.Window.surface := SDL_CreateRGBSurface(0, rect2.w{AVStream.codec.width},
+      rect2.h{AVStream.codec.height}, 24, $000000FF, $0000FF00, $00FF0000, $00000000);
   if not assigned(MooseTexture) then
     MooseTexture := SDL_CreateTextureFromSurface(FSDLPantalla.Renderer,
       FSDLPantalla.Window.surface);
@@ -399,7 +416,7 @@ end;
 
 procedure TMyFFMpegDisplay.OnTimer(sendder: TObject);
 begin
-  SDL_RenderPresent(FSDLPantalla^.Renderer);
+  //SDL_RenderPresent(FSDLPantalla^.Renderer);
 end;
 
 procedure TMyFFMpegDisplay.Resize(Sender: TObject);
@@ -624,8 +641,8 @@ var got_frame:PInteger;
   Size:Int64;
 begin
   if not Assigned(FormatContext) then Exit;
-  Task:=TTask.Run(procedure
-  begin
+  {Task:=TTask.Run(procedure
+  begin}
   FStop:=False;
   new(got_frame);
   try
@@ -655,7 +672,7 @@ begin
   finally
    Dispose(got_frame);
   end;
-  end);
+  //end);
   //Task.start;
 end;
 
