@@ -3,7 +3,7 @@
         <ProjectGuid>{7D80E749-F2E6-4D2B-993B-391A06FE2F0C}</ProjectGuid>
         <MainSource>FFMPEG.dpk</MainSource>
         <ProjectVersion>16.1</ProjectVersion>
-        <FrameworkType>None</FrameworkType>
+        <FrameworkType>VCL</FrameworkType>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
@@ -60,7 +60,7 @@
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
-        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;$(DCC_Namespace)</DCC_Namespace>
+        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
         <DCC_CBuilderOutput>All</DCC_CBuilderOutput>
         <GenDll>true</GenDll>
         <SanitizedProjectName>FFMPEG</SanitizedProjectName>
@@ -125,7 +125,9 @@
         </DelphiCompile>
         <DCCReference Include="rtl.dcp"/>
         <DCCReference Include="vcl.dcp"/>
+        <DCCReference Include="fmx.dcp"/>
         <DCCReference Include="uFFMPG.pas"/>
+        <DCCReference Include="uFFMpegThead.pas"/>
         <RcItem Include="fC.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>TMyFFMpeg</ResourceId>

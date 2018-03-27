@@ -30,9 +30,11 @@ package FFMPEG;
 
 requires
   rtl,
-  vcl;
+  vcl,
+  fmx;
 
 contains
-  uFFMPG in 'uFFMPG.pas';
+  uFFMPG in 'uFFMPG.pas',
+  uFFMpegThead in 'uFFMpegThead.pas';
 
 end.

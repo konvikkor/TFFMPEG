@@ -19,7 +19,8 @@ uses
   libavutil_mathematics, libavutil_md5, libavutil_mem, libavutil_motion_vector,
   libavutil_opt, libavutil_parseutils, libavutil_pixdesc, libavutil_pixfmt,
   libavutil_rational, libavutil_samplefmt, libavutil_time, libavutil_timestamp,
-  libswresample, libswscale, sdl2, {sdl, {uResourcePaths,} System.Threading;
+  libswresample, libswscale, sdl2, {sdl, {uResourcePaths,} System.Threading,
+  FMX.Graphics, FMX.Types, FMX.Canvas.D2D;
 // , SDL2_Frame;
 
 resourcestring
@@ -87,10 +88,46 @@ Type
    bufsize: Integer;
   end;
 
+  TBitmapInfoHeader = Packed Record
+    Size:Int32;
+    w,h:Int32;
+    Color_Planes:Int16;
+    Bit_Per_Pixel:Int16;
+    Compression:Int32;
+    ImageSize:Int32;
+    ResolutionHorizontal:Int32;
+    ResolutionVertical:Int32;
+    ColorPlate:Int32;
+    ColorUsed:Int32;
+    RedMask,
+    GreenMask,
+    BlueMask,
+    AlphaMask:Int32;
+    LCS_WINDOWS_COLOR_SPACE:Int32;
+    Color_Space_endpoints: Array [0..35] of byte;
+    RedGamma:Int32;
+    GreenGamma:Int32;
+    BlueGamma:Int32;
+  End;
+
+  TBmpHead = packed record
+    Name:Array [0..1] of AnsiChar;
+    Size:Int32;
+    Reserved: Array [0..3] of byte;
+    StartAdress:Int32;
+    FormatHead:TBitmapInfoHeader;
+    Class Function Init:TBmpHead; Static;
+    Class Function InitSize(w,h, DataSize:Int32):TBmpHead; Static;
+  end;
+
+  TOnHookFrame = procedure (Frame:TAVFrame; Paket:TAVPacket; Steam:TAVStream)of object;
+
   TMyFFMpegCore = class (TComponent)
   private
+    FOnHookFrame: TOnHookFrame;
     function GetStream(Index: Integer): TStream;
   protected
+    FStop:Boolean;
     FStartPosition: TPosition;
     FEndposition: TPosition;
     FCurrentPosition: TPosition;
@@ -105,12 +142,13 @@ Type
     video_frame_count: Integer;
     audio_frame_count: Integer;
 
+    got_Frame:PInteger;
+
     //Tasks: Array of ITask;
-    FStop:Boolean;
     CS:TCriticalSection;
   public
     [Volatile]
-    pkt: TAVPacket;
+    AVPacket: TAVPacket;
     AVFrame:TAVFrame;
     function OpenFile(FileName:string):Boolean;
     Function CloseFile:Boolean;
@@ -128,18 +166,30 @@ Type
     Property EndPosition: TPosition read FEndposition;
     Property CurrentPosition: TPosition read FCurrentPosition;
     Property VideoStreamIndex:integer Read video_stream_idx default -1;
+    property OnHookFrame:TOnHookFrame read FOnHookFrame Write FOnHookFrame;
   end;
 
   TMyFFMpeg = class(TMyFFMpegCore)
   private
-   FStop:Boolean;
    FSeekTarget: Integer;
+   procedure OnStatusThead(var PlayStop:Boolean; var Close:Boolean);
+   procedure OnReadPaket(var Deley:Cardinal);
+   procedure OnSeek(var PlayStop:Boolean; var Close:Boolean);
+   procedure OnDecodeVIDEO(var Deley:Cardinal);
+   procedure OnDecodeAUDIO(var Deley:Cardinal);
+   procedure OnRunVIDEO(var Deley:Cardinal);
+   procedure OnRunAUDIO(var Deley:Cardinal);
+   procedure OnDelay(var TotalDelay:Cardinal);
   protected
    Task:ITask;
   public
+   class var MyDecodeThead:Pointer;//TThread;
+   Class Function SaveFrameAsBitmap(Frame:TAVFrame; Steam:TAVStream; var Pict: Vcl.Graphics.TBitmap):Boolean;
    Procedure Play;
    Procedure Stop;
+   function GetStatusPlay:Boolean;
    destructor Destroy; override;
+   constructor Create(AOwner: TComponent); override;
   published
    Property Seek:Integer read FSeekTarget Write FSeekTarget default -1;
   end;
@@ -147,6 +197,8 @@ Type
 procedure Register;
 
 implementation
+
+uses uFFMpegThead;
 
 procedure Register;
 begin
@@ -262,7 +314,8 @@ end;
 
 procedure TMyFFMpegDisplay.DestroyWnd;
 begin
-  FreeAndNil(Timer);
+  //FreeAndNil(Timer);
+  Timer.Enabled := False;
   if FSDLPantalla.Renderer <> nil then
   begin
     SDL_DestroyRenderer(FSDLPantalla.Renderer);
@@ -334,6 +387,7 @@ begin
       Img.linesize[0]);
     if res < 0 then
       Result := False;
+    SDL_RenderClear(FSDLPantalla^.Renderer);
     // копируем картинку с текстуры в рендер
     if FProportionally then begin
       res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture,
@@ -363,7 +417,9 @@ begin
  finally
   // очистка памяти от временного мусора
   av_free(ibmp_Buff);
+  //av_freep(ibmp_Buff);
   sws_freeContext(ImgConvContext);
+  //av_frame_unref(@Img);
   av_frame_free(@Img);
   Application.ProcessMessages;
   SDL_RenderPresent(FSDLPantalla^.Renderer);
@@ -448,10 +504,11 @@ begin
   inherited;
   av_register_all();
   avcodec_register_all();
-  av_init_packet(@pkt);
+  av_init_packet(@AVPacket);
   //av_frame_unref(frame);
-  pkt.Data := nil;
-  pkt.size := 0;
+  AVPacket.Data := nil;
+  AVPacket.size := 0;
+  New(got_Frame);
 end;
 
 function TMyFFMpegCore.DecodePaket(SteamID: Integer;
@@ -463,7 +520,7 @@ begin
   //if not Assigned(frame) then Frame := av_frame_alloc();
   (* decode video frame *)
   TicB:=GetTickCount;
-  ret := avcodec_decode_video2(Steams[SteamID].stream^.codec, @AVFrame{@frame}, got_frame, @pkt);
+  ret := avcodec_decode_video2(Steams[SteamID].stream^.codec, @AVFrame{@frame}, got_frame, @AVPacket);
   if ret < 0 then
   begin
     Result := ret;
@@ -471,16 +528,17 @@ begin
   end;
   TicE:=GetTickCount;
   if got_frame^ <> 0 then begin
-   if ((pkt.dts = AV_NOPTS_VALUE) and assigned(AVFrame.opaque) and (Int64(AVFrame.opaque^) <> AV_NOPTS_VALUE)) then
+   if ((AVPacket.dts = AV_NOPTS_VALUE) and assigned(AVFrame.opaque) and (Int64(AVFrame.opaque^) <> AV_NOPTS_VALUE)) then
     begin
      pts := Int64(AVFrame.opaque^);
     end
-   else if (pkt.dts <> AV_NOPTS_VALUE) then
+   else if (AVPacket.dts <> AV_NOPTS_VALUE) then
     begin
-     pts := pkt.dts
+     pts := AVPacket.dts
     end else pts := 0;
-   FCurrentPosition.TimeInt := round(pts * av_q2d(Steams[SteamID].stream^.codec.time_base));
-   FCurrentPosition.ts := pts;
+   //FCurrentPosition.TimeInt := round(AVFrame.pts{pts} * av_q2d(Steams[SteamID].stream^.time_base));
+   FCurrentPosition.TimeInt := AVFrame.pts{pts} * Steams[SteamID].stream^.time_base.den;
+   FCurrentPosition.ts := AVFrame.pts;{pts};
    FCurrentPosition.Time := UnixToDateTime(FCurrentPosition.TimeInt);
   end;
   Result:=TicE-TicB;
@@ -489,6 +547,7 @@ end;
 destructor TMyFFMpegCore.Destroy;
 begin
   //if Assigned(frame) then av_free(frame);
+  Dispose(got_Frame);
   inherited;
 end;
 
@@ -508,7 +567,7 @@ begin
  iSeekTarget := ts;
  try
   iSeekTarget := av_rescale_q(iSeekTarget*1000, AV_TIME_BASE_Q, Steams[SteamID].stream.time_base);
-  iSeekFlag := {AVSEEK_FLAG_ANY or }AVSEEK_FLAG_FRAME;
+  iSeekFlag := AVSEEK_FLAG_BACKWARD;//{AVSEEK_FLAG_ANY or }AVSEEK_FLAG_FRAME;
   iSuccess := avformat_seek_file(FormatContext,
                                  video_stream_idx,
                                  0,
@@ -601,11 +660,11 @@ var TicB1,TicE1:Cardinal;
   ret:Integer;
 begin
   TicB1:=GetTickCount;
-  ret := av_read_frame(FormatContext, @pkt);
+  ret := av_read_frame(FormatContext, @AVPacket);
   TicE1:=GetTickCount;
   if ret < 0 then
   begin
-   av_packet_unref(@pkt);
+   av_packet_unref(@AVPacket);
    raise Exception.Create('Error Message:Can not read Frame ' + sLineBreak + av_err2str(ret));
   end;
   Result:=TicE1-TicB1;
@@ -616,11 +675,11 @@ var TicB1,TicE1:Cardinal;
   ret:Integer;
 begin
   TicB1:=GetTickCount;
-  ret := av_read_frame(FormatContext, @pkt);
+  ret := av_read_frame(FormatContext, @AVPacket);
   TicE1:=GetTickCount;
   if ret < 0 then
   begin
-   av_packet_unref(@pkt);
+   av_packet_unref(@AVPacket);
    //raise Exception.Create('Error Message:Can not read Frame ' + sLineBreak + av_err2str(ret));
   end;
   Result:=TicE1-TicB1;
@@ -628,11 +687,135 @@ end;
 
 { TMyFFMpeg }
 
+constructor TMyFFMpeg.Create(AOwner: TComponent);
+begin
+  inherited Create(AOwner);
+  FStop:=True;
+  Self.MyDecodeThead:=TMyDecodeThead.Create(True);
+  TMyDecodeThead(Self.MyDecodeThead).FreeOnTerminate:=False;
+  TMyDecodeThead(Self.MyDecodeThead).MyFFMpeg:=Self;
+  TMyDecodeThead(Self.MyDecodeThead).Priority:=tpNormal;
+  TMyDecodeThead(Self.MyDecodeThead).OnStatusThead:=OnStatusThead;
+  TMyDecodeThead(Self.MyDecodeThead).OnReadPaket:=OnReadPaket;
+  TMyDecodeThead(Self.MyDecodeThead).OnSeek:=OnSeek;
+  TMyDecodeThead(Self.MyDecodeThead).OnDecodeVIDEO:=OnDecodeVIDEO;
+  TMyDecodeThead(Self.MyDecodeThead).OnDecodeAUDIO:=OnDecodeAUDIO;
+  TMyDecodeThead(Self.MyDecodeThead).OnRunVIDEO:=OnRunVIDEO;
+  TMyDecodeThead(Self.MyDecodeThead).OnRunAUDIO:=OnRunAUDIO;
+  TMyDecodeThead(Self.MyDecodeThead).OnDelay:=OnDelay;
+  TMyDecodeThead(Self.MyDecodeThead).OnHookFrame:=FOnHookFrame;
+end;
+
 destructor TMyFFMpeg.Destroy;
 begin
   FStop:=True;
+  if Assigned(MyDecodeThead) then begin
+    TMyDecodeThead(Self.MyDecodeThead).Terminate;
+  end;
+  FreeAndNil(TMyDecodeThead(Self.MyDecodeThead));
   Application.ProcessMessages;
   inherited;
+end;
+
+function TMyFFMpeg.GetStatusPlay: Boolean;
+begin
+  Result:=FStop;
+end;
+
+procedure TMyFFMpeg.OnDecodeAUDIO(var Deley: Cardinal);
+begin
+ //not use
+end;
+
+procedure TMyFFMpeg.OnDecodeVIDEO(var Deley: Cardinal);
+var TicB,TicE:Cardinal;
+    ret:Integer;
+    pts: Int64;
+begin
+  //if not Assigned(frame) then Frame := av_frame_alloc();
+  (* decode video frame *)
+  if AVPacket.stream_index <> video_stream_idx then exit;
+  TicB:=GetTickCount;
+  ret := avcodec_decode_video2(Steams[AVPacket.stream_index].stream^.codec, @AVFrame{@frame}, got_frame, @AVPacket);
+  if ret < 0 then
+  begin
+    Deley := ret;
+    raise Exception.Create('Error decoding video frame (' + string(av_err2str(ret)) + ')');
+  end;
+  TicE:=GetTickCount;
+  if got_frame^ <> 0 then begin
+   if ((AVPacket.dts = AV_NOPTS_VALUE) and assigned(AVFrame.opaque) and (Int64(AVFrame.opaque^) <> AV_NOPTS_VALUE)) then
+    begin
+     pts := Int64(AVFrame.opaque^);
+    end
+   else if (AVPacket.dts <> AV_NOPTS_VALUE) then
+    begin
+     pts := AVPacket.dts
+    end else pts := 0;
+   //FCurrentPosition.TimeInt := round(AVFrame.pts{pts} * av_q2d(Steams[SteamID].stream^.time_base));
+   FCurrentPosition.TimeInt := AVFrame.pts{pts} * (Steams[AVPacket.stream_index].stream^.time_base.num div Steams[AVPacket.stream_index].stream^.time_base.den);
+   FCurrentPosition.ts := AVFrame.pts;{pts};
+   FCurrentPosition.Time := UnixToDateTime(FCurrentPosition.TimeInt);
+   if Assigned(Self.FOnHookFrame) then Self.FOnHookFrame(AVFrame,AVPacket,Steams[AVPacket.stream_index].stream^);
+  end;
+  Deley:=Deley+(TicE-TicB);
+end;
+
+procedure TMyFFMpeg.OnDelay(var TotalDelay: Cardinal);
+begin
+  av_packet_unref(@AVPacket);
+  TotalDelay:=0;
+end;
+
+procedure TMyFFMpeg.OnReadPaket(var Deley:Cardinal);
+var TicB1,TicE1:Cardinal;
+  ret:Integer;
+begin
+  TicB1:=GetTickCount;
+  ret := av_read_frame(FormatContext, @AVPacket);
+  TicE1:=GetTickCount;
+  if ret < 0 then
+  begin
+   av_packet_unref(@AVPacket);
+   //raise Exception.Create('Error Message:Can not read Frame ' + sLineBreak + av_err2str(ret));
+  end;
+  Deley:=Deley+(TicE1-TicB1);
+end;
+
+procedure TMyFFMpeg.OnRunAUDIO(var Deley: Cardinal);
+begin
+  //not use
+end;
+
+procedure TMyFFMpeg.OnRunVIDEO(var Deley: Cardinal);
+var d:Int64;
+begin
+ d:=Deley;
+ //d:=round(av_q2d(Steams[video_stream_idx].stream.avg_frame_rate)-Deley);
+ if d < 0 then Deley:=0
+ else Deley:=d;
+ if AVPacket.stream_index <> video_stream_idx then Exit;
+ if Assigned(FFMpedDisplay) then begin
+  FFMpedDisplay.DisplayInit(Steams[AVPacket.stream_index].stream);
+  FFMpedDisplay.DisplayFrame(AVFrame,Steams[AVPacket.stream_index].stream,Deley);
+ end;
+ av_frame_unref(@AVFrame);
+end;
+
+procedure TMyFFMpeg.OnSeek(var PlayStop, Close: Boolean);
+begin
+ PlayStop:=FStop;
+ Close:=False;
+ if FSeekTarget > 0 then begin
+  GoToFrameToTS(video_stream_idx,FSeekTarget);
+  FSeekTarget:=-1;
+ end;
+end;
+
+procedure TMyFFMpeg.OnStatusThead(var PlayStop, Close: Boolean);
+begin
+ PlayStop:=FStop;
+ Close:=False;
 end;
 
 procedure TMyFFMpeg.Play;
@@ -641,39 +824,89 @@ var got_frame:PInteger;
   Size:Int64;
 begin
   if not Assigned(FormatContext) then Exit;
-  {Task:=TTask.Run(procedure
-  begin}
+  if not Assigned(MyDecodeThead) then exit;
   FStop:=False;
-  new(got_frame);
+  {if not TMyDecodeThead(Self.MyDecodeThead).Suspended then }TMyDecodeThead(Self.MyDecodeThead).Start;
+end;
+
+class function TMyFFMpeg.SaveFrameAsBitmap(Frame: TAVFrame;  Steam:TAVStream;
+  var Pict: Vcl.Graphics.TBitmap): Boolean;
+var
+  res: SInt32;
+  ImgConvContext: PSwsContext;
+  Img: PAVFrame;
+  Ibmp_Size: Integer;
+  ibmp_Buff: PByte;
+  pix_F: TAVPixelFormat;
+
+  TmpData:Pointer;
+  FileLine:TArray<Byte>;
+
+  Color: Array [0 .. 3] of Byte;
+  c1,c2,c3,c4:Byte;
+  RGB:TColor;
+  i, j, linesize: Integer;
+
+  BMPH:TBmpHead;
+
+  mem:TMemoryStream;
+begin Result := False;
+ if Steam.codec.codec_type <> AVMEDIA_TYPE_VIDEO then Exit;
+ try
+  pix_F := AV_PIX_FMT_BGR0;
+  mem:=TMemoryStream.Create;
+  Img := av_frame_alloc(); // Создаём пространство для конвертированного кадра
+  ImgConvContext := nil;
+  ImgConvContext := sws_getContext(Steam.codec.width, Steam.codec.height,
+    Steam.codec.pix_fmt, Steam.codec.width, Steam.codec.height, pix_F, SWS_BILINEAR, nil,
+    nil, nil);
+  // Формируем буфер для картинки RGB
+  Ibmp_Size := avpicture_get_size(pix_F, Steam.codec.width, Steam.codec.height);
+  ibmp_Buff := nil;
+  ibmp_Buff := av_malloc(Ibmp_Size * SizeOf(Byte));
+  res := avpicture_fill(PAVPicture(Img), ibmp_Buff, pix_F, Steam.codec.width, Steam.codec.height);
+  // конвертируем формат пикселя в RGB
+  if Assigned(ImgConvContext) then
+   res := sws_scale(ImgConvContext, @Frame.Data, @Frame.linesize, 0, Steam.codec.height, @Img.Data, @Img.linesize);
+  TmpData:=@Img.Data[0]^;//Pointer(integer(@Img.Data[0]^)+(Img.linesize[0]*(Steam.codec.height)));
+  pict.PixelFormat := pf24bit;
+  Pict.Create;
+  Pict.width := Steam.codec.width;
+  Pict.height := Steam.codec.height;
+  SetLength(FileLine,Img.linesize[0]);
+  BMPH:=BMPH.InitSize(Steam.codec.width, Steam.codec.height,Ibmp_Size);
+  mem.Write(BMPH,SizeOf(BMPH));
   try
-   got_frame^:=0;
-   while not FStop do begin
-    if Application.Terminated then Break;
-    Application.ProcessMessages;
-    if FSeekTarget > 0 then begin
-      GoToFrameToTS(video_stream_idx,FSeekTarget);
-      FSeekTarget:=-1;
-    end;
-    Delay:=ReadFrameTry;
-    Size:=pkt.size;
-    if Size > 0 then
-    if pkt.stream_index = video_stream_idx then begin
-      Delay:=Delay + DecodePaket(pkt.stream_index,got_frame);
-      if Assigned(FFMpedDisplay) then begin
-        FFMpedDisplay.DisplayInit(Steams[pkt.stream_index].stream);
-        FFMpedDisplay.DisplayFrame(AVFrame,Steams[pkt.stream_index].stream,Delay);
+      for i := Steam.codec.height downto 1 do begin
+       FillChar(FileLine[0],Img.linesize[0],0);
+       linesize:=0;
+       TmpData:= Pointer(Integer(@Img.Data[0]^)+((Img.linesize[0]*i)-Img.linesize[0]));
+       repeat
+         c1:=Byte(PByte(Pointer(Integer(TmpData)+linesize))^);inc(linesize); //R
+         c2:=Byte(PByte(Pointer(Integer(TmpData)+linesize))^);inc(linesize); //G
+         c3:=Byte(PByte(Pointer(Integer(TmpData)+linesize))^);inc(linesize); //B
+         c4:=Byte(PByte(Pointer(Integer(TmpData)+linesize))^);inc(linesize); //A
+         FileLine[linesize-4]:=c1;
+         FileLine[linesize-3]:=c2;
+         FileLine[linesize-2]:=c3;
+         FileLine[linesize-1]:=c4;
+       until linesize >= Img.linesize[0];
+       mem.WriteData(FileLine,linesize);
       end;
-      if (got_frame^ <> 0) then begin
-       av_frame_unref(@AVFrame);//av_frame_unref(@frame);
-      end;
-    end;
-    if Size <= 0 then Break;
-   end;
   finally
-   Dispose(got_frame);
+   mem.Position:=0;
+   //mem.SaveToFile('E:\Vidio\fr\'+IntToStr(Frame.pts)+'.bmp');
+   //mem.Position:=0;
+   Pict.LoadFromStream(mem);
+   FreeAndNil(mem);
   end;
-  //end);
-  //Task.start;
+ finally
+  // очистка памяти от временного мусора
+  av_free(ibmp_Buff);
+  sws_freeContext(ImgConvContext);
+  av_frame_free(@Img);
+  Application.ProcessMessages;
+ end;
 end;
 
 procedure TMyFFMpeg.Stop;
@@ -681,4 +914,44 @@ begin
   FStop:=True;
 end;
 
+{ TBmpHead }
+
+class function TBmpHead.Init: TBmpHead;
+begin
+ Result.Name[0]:='B';
+ Result.Name[1]:='M';
+ Result.Reserved[0]:=0;
+ Result.Reserved[1]:=0;
+ Result.Reserved[2]:=0;
+ Result.Reserved[3]:=0;
+ Result.StartAdress:=14+SizeOf(TBitmapInfoHeader);
+ Result.FormatHead.Size:=SizeOf(TBitmapInfoHeader);
+ Result.FormatHead.Compression:=3;
+ Result.FormatHead.ResolutionHorizontal:=2835;
+ Result.FormatHead.ResolutionVertical:=2835;
+ Result.FormatHead.Bit_Per_Pixel:=32;
+ Result.FormatHead.ColorPlate:=0;
+ Result.FormatHead.ColorUsed:=0;
+ Result.FormatHead.Color_Planes:=1;
+ Result.FormatHead.RedMask   :=$00FF0000;
+ Result.FormatHead.GreenMask :=$0000FF00;
+ Result.FormatHead.BlueMask  :=$000000FF;
+ Result.FormatHead.AlphaMask :=$FF000000;
+ Result.FormatHead.LCS_WINDOWS_COLOR_SPACE:=$206E6957;
+ //Result.FormatHead.Color_Space_endpoints: Array [0..35] of byte;
+ Result.FormatHead.RedGamma:=0;
+ Result.FormatHead.GreenGamma:=0;
+ Result.FormatHead.BlueGamma:=0;
+end;
+
+class function TBmpHead.InitSize(w, h, DataSize: Int32): TBmpHead;
+begin
+  Result:=TBmpHead.Init;
+  Result.FormatHead.w:=w;
+  Result.FormatHead.h:=h;
+  Result.FormatHead.ImageSize:=DataSize;
+  Result.Size:=Result.FormatHead.ImageSize+SizeOf(TBmpHead);
+end;
+
 end.
+
