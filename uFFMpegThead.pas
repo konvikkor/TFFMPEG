@@ -20,7 +20,7 @@ uses
   libavutil_opt, libavutil_parseutils, libavutil_pixdesc, libavutil_pixfmt,
   libavutil_rational, libavutil_samplefmt, libavutil_time, libavutil_timestamp,
   libswresample, libswscale, sdl2, {sdl, {uResourcePaths,} System.Threading,
-  uFFMPG;
+  uFFmpg;
 
 type
   TOnStatusThead = procedure (var PlayStop:Boolean; var Close:Boolean) of object;
@@ -71,22 +71,40 @@ procedure TMyDecodeThead.Execute;
 var Delay:cardinal;
     FClose:Boolean;
 begin FClose:=False;
- if not Assigned(FMyFFMpeg) then Exit;
- Synchronize(SyncStatus);
+ //if not Assigned(FMyFFMpeg) then Exit;
  while (not Self.Terminated)do begin
   try
    Synchronize(SyncStatus);
-   if (FStop) or (FClose) then Break;
+   if (FStop) or (FClose) then begin
+    if Assigned(FMyFFMpeg.Display) then FMyFFMpeg.Display.UpdateRender;
+   if Assigned(FReadPaket) then begin
+    av_packet_unref(@FMyFFMpeg.AVPacket);
+    av_frame_unref(@FMyFFMpeg.AVFrame);
+    if Assigned(FSeek) then FSeek(FStop,FClose);
+    av_packet_unref(@FMyFFMpeg.AVPacket);
+    av_frame_unref(@FMyFFMpeg.AVFrame);
+   end;
+    Sleep(100);
+    Continue;
+   end;
    Delay:=0;
-   if Assigned(FSeek) then FSeek(FStop,FClose);
+   if Assigned(FSeek) then begin
+    FSeek(FStop,FClose);
+    av_packet_unref(@FMyFFMpeg.AVPacket);
+    av_frame_unref(@FMyFFMpeg.AVFrame);
+   end;
    if Assigned(FReadPaket) then begin
     FReadPaket(Delay);
     if FMyFFMpeg.AVPacket.size <=0 then begin
      FMyFFMpeg.Stop;
-     Break; // if end file then stop
+     Continue; // if end file then stop
     end;
     if Assigned(FDecodeVIDEO) then begin
      FDecodeVIDEO(Delay);
+     if Delay = $FFFFFFFF then begin
+      Delay:=3;
+      Sleep(Delay);
+     end else
      if Assigned(FRunVIDEO) then FRunVIDEO(Delay);
     end;
    end;

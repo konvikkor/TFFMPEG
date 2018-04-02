@@ -63,8 +63,10 @@ type
     Function DisplayFrame(var AVFrame: TAVFrame; AVStream: PAVStream; DeleyTime:Cardinal = 0): Boolean;
     Function DisplayInit(AVStream: PAVStream): Boolean;
     Function DisplayFree: Boolean;
+    Procedure UpdateRender;
     property DeleyTime:Byte read FDeley write SetDeley default 25;
   published
+    property Anchors;
     property OnContextPopup;
     property PopupMenu;
     property OnResize;
@@ -127,7 +129,7 @@ Type
     FOnHookFrame: TOnHookFrame;
     function GetStream(Index: Integer): TStream;
   protected
-    FStop:Boolean;
+    FSeekTarget: Integer;
     FStartPosition: TPosition;
     FEndposition: TPosition;
     FCurrentPosition: TPosition;
@@ -145,6 +147,7 @@ Type
     got_Frame:PInteger;
 
     //Tasks: Array of ITask;
+    FStop:Boolean;
     CS:TCriticalSection;
   public
     [Volatile]
@@ -171,7 +174,6 @@ Type
 
   TMyFFMpeg = class(TMyFFMpegCore)
   private
-   FSeekTarget: Integer;
    procedure OnStatusThead(var PlayStop:Boolean; var Close:Boolean);
    procedure OnReadPaket(var Deley:Cardinal);
    procedure OnSeek(var PlayStop:Boolean; var Close:Boolean);
@@ -492,6 +494,12 @@ begin
   FDeley := Value;
 end;
 
+procedure TMyFFMpegDisplay.UpdateRender;
+begin
+ if Assigned(FSDLPantalla^.Renderer) then
+  SDL_RenderPresent(FSDLPantalla^.Renderer);
+end;
+
 { TMyFFMpegCore }
 
 function TMyFFMpegCore.CloseFile: Boolean;
@@ -564,15 +572,17 @@ var
   iSeekTarget: Int64;
   iSuccess: Integer;
 begin
- iSeekTarget := ts;
+ iSeekTarget := ts*1000;
  try
-  iSeekTarget := av_rescale_q(iSeekTarget*1000, AV_TIME_BASE_Q, Steams[SteamID].stream.time_base);
-  iSeekFlag := AVSEEK_FLAG_BACKWARD;//{AVSEEK_FLAG_ANY or }AVSEEK_FLAG_FRAME;
+  avcodec_flush_buffers(Steams[SteamID].stream.codec);
+  iSeekTarget := av_rescale_q(iSeekTarget, AV_TIME_BASE_Q, Steams[SteamID].stream.time_base);
+  iSeekFlag := 0;//AVSEEK_FLAG_BACKWARD;// or AVSEEK_FLAG_ANY or AVSEEK_FLAG_FRAME;
+  if iSeekTarget > FEndposition.ts then iSeekTarget := ts;
   iSuccess := avformat_seek_file(FormatContext,
                                  video_stream_idx,
-                                 0,
+                                 FStartPosition.ts,//0,
                                  iSeekTarget,
-                                 Round(FormatContext.duration * av_q2d(Steams[SteamID].stream.time_base)),
+                                 FEndposition.ts,//Round(FormatContext.duration * av_q2d(Steams[SteamID].stream.time_base)),
                                  iSeekFlag);
   if iSuccess < 0 then raise Exception.Create('Error [av_seek_frame] Message:'+av_err2str(iSuccess));
  except
@@ -691,7 +701,7 @@ constructor TMyFFMpeg.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
   FStop:=True;
-  Self.MyDecodeThead:=TMyDecodeThead.Create(True);
+  Self.MyDecodeThead:=TMyDecodeThead.Create(False);
   TMyDecodeThead(Self.MyDecodeThead).FreeOnTerminate:=False;
   TMyDecodeThead(Self.MyDecodeThead).MyFFMpeg:=Self;
   TMyDecodeThead(Self.MyDecodeThead).Priority:=tpNormal;
@@ -734,7 +744,10 @@ var TicB,TicE:Cardinal;
 begin
   //if not Assigned(frame) then Frame := av_frame_alloc();
   (* decode video frame *)
-  if AVPacket.stream_index <> video_stream_idx then exit;
+  if AVPacket.stream_index <> video_stream_idx then begin
+   Deley:=$FFFFFFFF;
+   exit;
+  end;
   TicB:=GetTickCount;
   ret := avcodec_decode_video2(Steams[AVPacket.stream_index].stream^.codec, @AVFrame{@frame}, got_frame, @AVPacket);
   if ret < 0 then
@@ -764,6 +777,7 @@ end;
 procedure TMyFFMpeg.OnDelay(var TotalDelay: Cardinal);
 begin
   av_packet_unref(@AVPacket);
+  av_frame_unref(@AVFrame);
   TotalDelay:=0;
 end;
 
@@ -826,7 +840,7 @@ begin
   if not Assigned(FormatContext) then Exit;
   if not Assigned(MyDecodeThead) then exit;
   FStop:=False;
-  {if not TMyDecodeThead(Self.MyDecodeThead).Suspended then }TMyDecodeThead(Self.MyDecodeThead).Start;
+  if not TMyDecodeThead(Self.MyDecodeThead).Started then TMyDecodeThead(Self.MyDecodeThead).Start;
 end;
 
 class function TMyFFMpeg.SaveFrameAsBitmap(Frame: TAVFrame;  Steam:TAVStream;
@@ -954,4 +968,3 @@ begin
 end;
 
 end.
-

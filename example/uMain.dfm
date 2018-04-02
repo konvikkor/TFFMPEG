@@ -23,21 +23,13 @@ object Form1: TForm1
     ExplicitTop = 0
     ExplicitWidth = 399
   end
-  object MyFFMpegDisplay1: TMyFFMpegDisplay
-    Left = 0
-    Top = 0
-    Width = 635
-    Height = 396
-    PopupMenu = PopupMenu1
-    Align = alClient
-  end
   object Memo1: TMemo
     Left = 0
     Top = 399
     Width = 635
     Height = 89
     Align = alBottom
-    TabOrder = 1
+    TabOrder = 0
   end
   object StatusBar1: TStatusBar
     Left = 0
@@ -45,6 +37,15 @@ object Form1: TForm1
     Width = 635
     Height = 19
     Panels = <>
+  end
+  object MyFFMpegDisplay1: TMyFFMpegDisplay
+    Left = 0
+    Top = 0
+    Width = 635
+    Height = 396
+    PopupMenu = PopupMenu1
+    Align = alClient
+    ExplicitTop = -3
   end
   object MyFFMpeg1: TMyFFMpeg
     Display = MyFFMpegDisplay1
