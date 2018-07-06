@@ -635,6 +635,18 @@ begin Result:=False; opts:=nil;
        raise Exception.Create ('Error Message:Could not allocate raw video buffer');
      Steams[i].bufsize := ret;
     end;
+    if PAVstream(PPtrIdx(FormatContext.streams, I))^.codec.codec_type = AVMEDIA_TYPE_AUDIO then begin
+     Steams[i].stream := PPtrIdx(FormatContext.streams, I);
+     avdec := avcodec_find_decoder(Steams[i].stream.codec.codec_id);
+     if not assigned(avdec) then
+       raise Exception.Create('Error Message:Failed to find ' + string(av_get_media_type_string(Steams[i].stream.codec.codec_type)) + ' codec');
+     (* Init the decoders, with or without reference counting *)
+     //av_dict_set(@opts, 'refcounted_frames', '1', 0);  /// Test Function
+     ret := avcodec_open2(Steams[i].stream.codec, avdec, @opts);
+     if ret < 0 then
+       raise Exception.Create('Error Message:Failed to open ' + string(av_get_media_type_string(Steams[i].stream.codec.codec_type)) + ' codec');
+     //Steams[i].bufsize := ret;
+    end;
   end;
   {* инициализация глобальных переменных *}
   FStartPosition.TimeInt :=

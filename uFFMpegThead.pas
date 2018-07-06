@@ -99,11 +99,19 @@ begin FClose:=False;
      FMyFFMpeg.Stop;
      Continue; // if end file then stop
     end;
+    if Assigned(FDecodeAUDIO) then begin
+     FDecodeAUDIO(Delay);
+     if Delay = $FFFFFFFF then begin
+      //Delay:=3;
+      //Sleep(Delay);
+     end else
+     if Assigned(FRunAUDIO) then FRunAUDIO(Delay);
+    end;
     if Assigned(FDecodeVIDEO) then begin
      FDecodeVIDEO(Delay);
      if Delay = $FFFFFFFF then begin
-      Delay:=3;
-      Sleep(Delay);
+      //Delay:=3;
+      //Sleep(Delay);
      end else
      if Assigned(FRunVIDEO) then FRunVIDEO(Delay);
     end;
