@@ -102,7 +102,7 @@ begin FClose:=False;
     if Assigned(FDecodeAUDIO) then begin
      FDecodeAUDIO(Delay);
      if Delay = $FFFFFFFF then begin
-      //Delay:=3;
+      Delay:=3;
       //Sleep(Delay);
      end else
      if Assigned(FRunAUDIO) then FRunAUDIO(Delay);
@@ -110,7 +110,7 @@ begin FClose:=False;
     if Assigned(FDecodeVIDEO) then begin
      FDecodeVIDEO(Delay);
      if Delay = $FFFFFFFF then begin
-      //Delay:=3;
+      Delay:=3;
       //Sleep(Delay);
      end else
      if Assigned(FRunVIDEO) then FRunVIDEO(Delay);

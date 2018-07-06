@@ -640,8 +640,6 @@ begin Result:=False; opts:=nil;
      avdec := avcodec_find_decoder(Steams[i].stream.codec.codec_id);
      if not assigned(avdec) then
        raise Exception.Create('Error Message:Failed to find ' + string(av_get_media_type_string(Steams[i].stream.codec.codec_type)) + ' codec');
-     (* Init the decoders, with or without reference counting *)
-     //av_dict_set(@opts, 'refcounted_frames', '1', 0);  /// Test Function
      ret := avcodec_open2(Steams[i].stream.codec, avdec, @opts);
      if ret < 0 then
        raise Exception.Create('Error Message:Failed to open ' + string(av_get_media_type_string(Steams[i].stream.codec.codec_type)) + ' codec');
@@ -747,6 +745,7 @@ end;
 procedure TMyFFMpeg.OnDecodeAUDIO(var Deley: Cardinal);
 begin
  //not use
+ Deley:=0;
 end;
 
 procedure TMyFFMpeg.OnDecodeVIDEO(var Deley: Cardinal);
