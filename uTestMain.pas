@@ -26,9 +26,11 @@ type
     TabSheet2: TTabSheet;
     TrayIcon1: TTrayIcon;
     TaskDialog1: TTaskDialog;
+    Play1: TMenuItem;
     procedure Open1Click(Sender: TObject);
     procedure DecodePak1Click(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
+    procedure Play1Click(Sender: TObject);
   private
     { Private declarations }
   public
@@ -119,6 +121,11 @@ begin
  MediaMainCore.OpenFile(OpenDialog1.FileName);
  Memo1.Lines.Add(OpenDialog1.FileName);
  Memo1.Lines.Add(MediaDecoder.GetStatus);
+end;
+
+procedure TForm1.Play1Click(Sender: TObject);
+begin
+  MediaDecoder.Play;
 end;
 
 procedure TForm1.Timer1Timer(Sender: TObject);

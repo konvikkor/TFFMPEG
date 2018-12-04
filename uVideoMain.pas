@@ -74,8 +74,9 @@ type
     CSTime:TCriticalSection;
     GlobalTime:Cardinal;
     Buffer: TArray<PMediaBufferInfo>;
-    MaxBuff:Cardinal;
-    AddIndex, ReadIndex:Cardinal; (* Navigate index in buffer *)
+    var [volatile]MaxBuff:Cardinal;
+    var [volatile]AddIndex:Cardinal;
+    var [volatile]ReadIndex:Cardinal; (* Navigate index in buffer *)
   public
     constructor Create(CreateSuspended: Boolean); overload;
     destructor Destroy; overload;
@@ -89,12 +90,16 @@ type
 
   TMediaVideo = Class(TMediaBuffer)(* Video Play *)
   private
-    TmpInfo:PMediaBufferInfo;
+    TmpInfo:TMediaBufferInfo;
     FOnRenderVideo: TOnRenderVideo;
     Function GetData:Boolean;
     Function DelData:Boolean;
     procedure DecodePakedFromFrame;
+    function IsTime:Boolean;
+  protected
+    procedure Execute; override;
   public
+    constructor Create(CreateSuspended: Boolean); overload;
     function ClearBuffer: Boolean; override;
     function AddBufItem(Item: PMediaBufferInfo): Boolean; override;
     function GetBuffItem(Index: Cardinal): PMediaBufferInfo; override;
@@ -259,19 +264,20 @@ begin
   'Time Start?F '+FloatToStr(FCore.AVFormatContext.start_time *(FCore.AVStream.Items[i].AVStream.time_base.num / FCore.AVStream.Items[i].AVStream.time_base.den))+sLineBreak+
   'Time Start?R '+FormatDateTime('hh:mm:ss.zzz',IncMilliSecond(round(FCore.AVFormatContext.start_time *(FCore.AVStream.Items[i].AVStream.time_base.num / FCore.AVStream.Items[i].AVStream.time_base.den))))+sLineBreak+
   'Time End?R '+FormatDateTime('hh:mm:ss.zzz',IncMilliSecond(MinDateTime,FCore.AVFormatContext.duration div 1000))+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.index='+IntToStr(FCore.AVStream.Items[i].AVStream.index)+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.id='+IntToStr(FCore.AVStream.Items[i].AVStream.id)+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.start_time='+IntToStr(FCore.AVStream.Items[i].AVStream.start_time)+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.pts.den='+IntToStr(FCore.AVStream.Items[i].AVStream.pts.den)+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.pts.num='+IntToStr(FCore.AVStream.Items[i].AVStream.pts.num)+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.pts.val='+IntToStr(FCore.AVStream.Items[i].AVStream.pts.val)+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.time_base.num='+IntToStr(FCore.AVStream.Items[i].AVStream.time_base.num)+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.time_base.den='+IntToStr(FCore.AVStream.Items[i].AVStream.time_base.den)+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.nb_frames='+IntToStr(FCore.AVStream.Items[i].AVStream.nb_frames)+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.r_frame_rate.num='+IntToStr(FCore.AVStream.Items[i].AVStream.r_frame_rate.num)+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.r_frame_rate.den='+IntToStr(FCore.AVStream.Items[i].AVStream.r_frame_rate.den)+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.avg_frame_rate.den='+IntToStr(FCore.AVStream.Items[i].AVStream.avg_frame_rate.den)+sLineBreak+
-  'TMP.AVStream.Items['+IntToStr(i)+'].AVStream.avg_frame_rate.den='+IntToStr(FCore.AVStream.Items[i].AVStream.avg_frame_rate.den)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.codec.codec_type='+av_get_media_type_string(FCore.AVStream.Items[i].AVStream.codec.codec_type)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.index='+IntToStr(FCore.AVStream.Items[i].AVStream.index)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.id='+IntToStr(FCore.AVStream.Items[i].AVStream.id)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.start_time='+IntToStr(FCore.AVStream.Items[i].AVStream.start_time)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.pts.den='+IntToStr(FCore.AVStream.Items[i].AVStream.pts.den)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.pts.num='+IntToStr(FCore.AVStream.Items[i].AVStream.pts.num)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.pts.val='+IntToStr(FCore.AVStream.Items[i].AVStream.pts.val)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.time_base.num='+IntToStr(FCore.AVStream.Items[i].AVStream.time_base.num)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.time_base.den='+IntToStr(FCore.AVStream.Items[i].AVStream.time_base.den)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.nb_frames='+IntToStr(FCore.AVStream.Items[i].AVStream.nb_frames)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.r_frame_rate.num='+IntToStr(FCore.AVStream.Items[i].AVStream.r_frame_rate.num)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.r_frame_rate.den='+IntToStr(FCore.AVStream.Items[i].AVStream.r_frame_rate.den)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.avg_frame_rate.den='+IntToStr(FCore.AVStream.Items[i].AVStream.avg_frame_rate.den)+sLineBreak+
+  'AVStream.Items['+IntToStr(i)+'].AVStream.avg_frame_rate.den='+IntToStr(FCore.AVStream.Items[i].AVStream.avg_frame_rate.den)+sLineBreak+
   '==========================================================================='+sLineBreak;
  end;
 
@@ -282,11 +288,17 @@ var neddpacked:Boolean;
 begin neddpacked:=False;
   if Assigned(FVideo) then begin
     FVideo.SyncTime(GlobalTime);
-    neddpacked:= 10 > FVideo.GetBufferSize;
+    neddpacked:= 10 > FVideo.GetBufCount;
+    if FVideo.Suspended and (not FVideo.Terminated) then begin
+      Sleep(10);
+      FVideo.Start;
+    end;
+  end else begin
+    FVideo:=TMediaVideo.Create(False);// Stop = True
   end;
   if Assigned(FAudio) then begin
     FAudio.SyncTime(GlobalTime);
-    neddpacked:= neddpacked and (10 > FAudio.GetBufferSize);
+    neddpacked:= neddpacked and (10 > FAudio.GetBufCount);
   end;
   if neddpacked then begin
     if not ReadPaked then begin
@@ -330,8 +342,8 @@ begin
   end else begin
    (* Write Video Paked *)
    if (MBI.AVPacket.stream_index = FCore.BestVideoStream)and(Assigned(FVideo)) then begin
-    for I := 0 to FCore.AVStream.Count -1 do begin
-     if FCore.AVStream[i].AVStream.index = FCore.BestVideoStream then
+    for I := 0 to FCore.AVStream.Count-1 do begin
+     if FCore.AVStream[i].AVStream.id = MBI.AVPacket.stream_index then
           MBI.AVStream:=FCore.AVStream[i].AVStream^;
     end;
     FVideo.AddBufItem(MBI);// VideoPacket.Add(tmpAVPacket)
@@ -342,7 +354,7 @@ begin
     (* Write Audio Paked *)
     if (MBI.AVPacket.stream_index = FCore.BestAudioStream)and(Assigned(FAudio)) then begin
       for I := 0 to FCore.AVStream.Count -1 do begin
-       if FCore.AVStream[i].AVStream.index = FCore.BestAudioStream then
+       if FCore.AVStream[i].AVStream.id = FCore.BestAudioStream then
             MBI.AVStream:=FCore.AVStream[i].AVStream^;
       end;
       FAudio.AddBufItem(MBI); //AudioPacket.Add(tmpAVPacket)
@@ -408,18 +420,25 @@ begin
   end;
 end;
 
+constructor TMediaVideo.Create(CreateSuspended: Boolean);
+begin
+  inherited Create(CreateSuspended);
+  FillChar(TmpInfo,SizeOf(TmpInfo),0);
+end;
+
 procedure TMediaVideo.DecodePakedFromFrame;
 var i,j,ret:Integer;
     pts:Int64;
 begin
-   (* Video Decode *)
-  try
+  (* Video Decode *)
+  (*try
   if not GetData then raise Exception.Create('Cannot read Buffer Data');
   except
     DelData;
     exit;
-  end;
-    if not Assigned(TmpInfo.GotFrame) then New(TmpInfo.GotFrame);
+  end;*)
+    if not Assigned(TmpInfo.GotFrame) then
+        New(TmpInfo.GotFrame);
     try
      FillChar(TmpInfo.AVFrame,SizeOf(TmpInfo.AVFrame),0);
      ret := avcodec_decode_video2(TmpInfo.AVStream.codec, @TmpInfo.AVFrame{@frame}, TmpInfo.GotFrame, @TmpInfo.AVPacket);
@@ -580,8 +599,10 @@ end;
 constructor TMediaBuffer.Create(CreateSuspended: Boolean);
 begin
   inherited Create(CreateSuspended);
+  MaxBuff:=500;
   CSTime:=TCriticalSection.Create;
   CS:=TCriticalSection.Create;
+  SetLength(Buffer,MaxBuff);
   AddIndex:=0;
   ReadIndex:=0;
   GlobalTime:=0;
@@ -624,23 +645,96 @@ end;
 
 function TMediaVideo.DelData: Boolean;
 begin
-  if Assigned(TmpInfo) then av_packet_unref(@TmpInfo.AVPacket);
-  if Assigned(TmpInfo) then av_frame_unref(@TmpInfo.AVFrame);
-  FreeMem(TmpInfo,Sizeof(TMediaBufferInfo));
-  TmpInfo:=nil;
+ CS.Enter;
+ try
+  //if Assigned(TmpInfo) then av_packet_unref(@TmpInfo.AVPacket);
+  av_packet_unref(@TmpInfo.AVPacket);
+  //if Assigned(TmpInfo) then av_frame_unref(@TmpInfo.AVFrame);
+  av_frame_unref(@TmpInfo.AVFrame);
+  if Assigned(TmpInfo.GotFrame) then Dispose(TmpInfo.GotFrame);
+  FillChar(TmpInfo,SizeOf(TmpInfo),0);
+  //FreeMem(TmpInfo,Sizeof(TMediaBufferInfo));
+  //TmpInfo:=nil;
+ finally
+   CS.Leave;
+ end;
+end;
+
+procedure TMediaVideo.Execute;
+begin
+ try
+  repeat
+   (* Video *) //TmpInfo -- buffer frame info and FrameData
+   if not Self.GetData then begin //Get Pak
+     if Self.Terminated then Break; //Exit "Repeat"
+     Sleep(5); // If not Terminated
+     Continue;
+   end;
+   Self.DecodePakedFromFrame;
+   repeat
+    Sleep(1);
+   until (IsTime or Self.Terminated);
+   (* Render Frame *)
+   (* Free data After Render *)
+   DelData;
+   (* Video *)
+   Sleep(1);
+  until Self.Terminated;
+ except
+
+ end;
 end;
 
 function TMediaVideo.GetBuffItem(Index: Cardinal): PMediaBufferInfo;
 begin
-  if Index > MaxBuff then raise Exception.Create('Out of range');
-  Result:=Buffer[Index];
+  CS.Enter;
+  try
+   if Index > MaxBuff then raise Exception.Create('Out of range');
+   Result:=Buffer[Index];
+  finally
+    CS.Leave;
+  end;
 end;
 
 function TMediaVideo.GetData: Boolean;
 begin
-  TmpInfo:=Buffer[ReadIndex];
-  Inc(ReadIndex);
-  if ReadIndex > MaxBuff then ReadIndex:=0;
+  CS.Enter;
+  try
+   ReadIndex:=ReadIndex+1;
+   if ReadIndex = MaxBuff then ReadIndex:=0;
+   if Buffer[ReadIndex] <> nil then begin
+    try
+     TmpInfo:=Buffer[ReadIndex]^;
+    except
+     FillChar(TmpInfo,SizeOf(TmpInfo),0);
+     Buffer[ReadIndex]:=nil;
+    end;
+   end;
+   Result := Buffer[ReadIndex] <> nil;
+  finally
+    CS.Leave;
+  end;
+end;
+
+function TMediaVideo.IsTime: Boolean;
+begin
+  Result:=False;
+  if not Assigned(TmpInfo.GotFrame) then exit;
+  try
+   if TmpInfo.AVPacket.pts <> AV_NOPTS_VALUE then begin
+     (* Set Buffer Time ? *)
+     CSTime.Enter;
+     try
+       Result:=GlobalTime >= ((TmpInfo.AVPacket.pts * round(TmpInfo.AVStream.time_base.num / TmpInfo.AVStream.time_base.den))*1000 (* return Milisecond *));
+     finally
+       CSTime.Leave;
+     end;
+   end else begin
+     Result:=True;
+   end;
+  except
+    Result:=False;
+  end;
 end;
 
 end.

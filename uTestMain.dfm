@@ -19,15 +19,11 @@ object Form1: TForm1
     Top = 0
     Width = 701
     Height = 306
-    ActivePage = TabSheet2
+    ActivePage = TabSheet1
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
       Caption = 'LOG'
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object Splitter1: TSplitter
         Left = 505
         Top = 0
@@ -119,6 +115,10 @@ object Form1: TForm1
     object DecodePak1: TMenuItem
       Caption = 'Decode Pak'
       OnClick = DecodePak1Click
+    end
+    object Play1: TMenuItem
+      Caption = 'Play'
+      OnClick = Play1Click
     end
   end
   object OpenDialog1: TOpenDialog
