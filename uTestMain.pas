@@ -27,32 +27,29 @@ type
     TrayIcon1: TTrayIcon;
     TaskDialog1: TTaskDialog;
     Play1: TMenuItem;
+    EST1: TMenuItem;
     procedure Open1Click(Sender: TObject);
     procedure DecodePak1Click(Sender: TObject);
-    procedure Timer1Timer(Sender: TObject);
+    procedure FormCreate(Sender: TObject);
+    procedure EST1Click(Sender: TObject);
     procedure Play1Click(Sender: TObject);
   private
     { Private declarations }
   public
     { Public declarations }
-    var MediaDecoder:TMediaDecoder;
-    var MediaMainCore:TMediaMainCore;
-    var MediaVideo:TMediaVideo;
+    Media:TMediaDecoder;
   end;
 
 var
   Form1: TForm1;
+  MediaDisplay:TMediaDisplay;
 
 implementation
 
 {$R *.dfm}
 
 procedure TForm1.DecodePak1Click(Sender: TObject);
-var i,j:integer;
 begin
-  if not Assigned(MediaDecoder) then exit;
-  if not Assigned(MediaMainCore) then exit;
-  if not Assigned(MediaVideo) then exit;
   {i:=1;
   try
    repeat
@@ -108,34 +105,33 @@ begin
   Memo3.Lines.EndUpdate;   *}
 end;
 
+procedure TForm1.EST1Click(Sender: TObject);
+begin
+  Media.ReadPacked;
+  Media.DecodeVideo;
+end;
+
+procedure TForm1.FormCreate(Sender: TObject);
+begin
+  MediaDisplay:=TMediaDisplay.Create(TabSheet2);
+  MediaDisplay.Parent:=TabSheet2;
+  MediaDisplay.Align:=alClient;
+end;
+
 procedure TForm1.Open1Click(Sender: TObject);
 var i:Integer;
 begin
  if not OpenDialog1.Execute then Exit;
- if not Assigned(MediaDecoder) then MediaDecoder:=TMediaDecoder.Create(self);
- if not Assigned(MediaMainCore) then begin
-  MediaMainCore:=TMediaMainCore.Create;
-  MediaDecoder.MediaCore:=MediaMainCore;
- end;
- if Assigned(MediaMainCore) then MediaMainCore.CloseFile;
- MediaMainCore.OpenFile(OpenDialog1.FileName);
- Memo1.Lines.Add(OpenDialog1.FileName);
- Memo1.Lines.Add(MediaDecoder.GetStatus);
+ if not Assigned(Media) then Media:=TMediaDecoder.Create
+ else Media.CloseFile;
+ Media.OpenFile(OpenDialog1.FileName);
+ Media.Display:=MediaDisplay;
 end;
 
 procedure TForm1.Play1Click(Sender: TObject);
 begin
-  MediaDecoder.Play;
-end;
-
-procedure TForm1.Timer1Timer(Sender: TObject);
-begin
-  if not Assigned(MediaDecoder) then exit;
-  {StatusBar1.Panels[0].Text:='AVStream:'+IntToStr(TMP.AVStream.Count);
-  StatusBar1.Panels[1].Text:='VPacket:'+IntToStr(TMP.VideoPacket.Count);
-  StatusBar1.Panels[2].Text:='VFrame:'+IntToStr(TMP.VideoFrame.Count);
-  StatusBar1.Panels[3].Text:='APacket:'+IntToStr(TMP.AudioPacket.Count);
-  StatusBar1.Panels[4].Text:='GlobalTime:'+IntToStr(TMP.GetGlobalTime);}
+  if not Assigned(Media) then exit;
+  Media.Start;
 end;
 
 end.

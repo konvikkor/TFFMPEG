@@ -12,6 +12,7 @@ object Form1: TForm1
   Font.Style = []
   OldCreateOrder = False
   PopupMenu = PopupMenu1
+  OnCreate = FormCreate
   PixelsPerInch = 96
   TextHeight = 13
   object PageControl1: TPageControl
@@ -120,13 +121,16 @@ object Form1: TForm1
       Caption = 'Play'
       OnClick = Play1Click
     end
+    object EST1: TMenuItem
+      Caption = 'TEST'
+      OnClick = EST1Click
+    end
   end
   object OpenDialog1: TOpenDialog
     Left = 176
     Top = 48
   end
   object Timer1: TTimer
-    OnTimer = Timer1Timer
     Left = 132
     Top = 40
   end
