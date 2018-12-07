@@ -19,7 +19,7 @@ uses
   libavutil_mathematics, libavutil_md5, libavutil_mem, libavutil_motion_vector,
   libavutil_opt, libavutil_parseutils, libavutil_pixdesc, libavutil_pixfmt,
   libavutil_rational, libavutil_samplefmt, libavutil_time, libavutil_timestamp,
-  libswresample, libswscale, sdl2, SDL2_ttf,{sdl, {uResourcePaths,} System.Threading;
+  libswresample, libswscale, sdl2, {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading;
 
 const
   MAX_AUDIO_FRAME_SIZE = 192000; // 1 second of 48khz 32bit audio
@@ -62,7 +62,6 @@ type
   protected
     procedure Paint; override;
     Function CaslcSize(Sourse:TSDL_Rect):TSDL_Rect;
-    procedure Resize; override;
     procedure OnRenderVideo(var Data:PMediaBufferInfo);
   public
     constructor Create(AOwner: TComponent); override;
@@ -226,6 +225,7 @@ begin
   Timer.Interval:=20;
   Timer.OnTimer:=OnTimer;
   Timer.Enabled:=True;
+  FProportionally:=True;
 end;
 
 procedure TMediaDisplay.CreateWnd;
@@ -233,13 +233,13 @@ begin
   inherited;
   if SDL_WasInit(SDL_INIT_VIDEO) <> SDL_INIT_VIDEO then
     SDL_InitSubSystem(SDL_INIT_VIDEO);
-  if TTF_Init = 0 then begin
+  (*if TTF_Init = 0 then begin
    if not TTF_WasInit() then begin
      raise Exception.Create('Error Message [TTF_WasInit]:'+TTF_GetError());
    end;
   end else begin
     raise Exception.Create('Error Message [TTF_Init]:'+TTF_GetError());
-  end;
+  end;*)
   New(FSDLPantalla);
   FSDLPantalla.Window := SDL_CreateWindowFrom(Pointer(Self.Handle));
   if FSDLPantalla.Window <> nil then
@@ -306,7 +306,7 @@ begin
     SDL_DestroyWindow(FSDLPantalla.Window);
     FSDLPantalla.Window := nil;
   end;
-  TTF_Quit;
+  //TTF_Quit;
   Dispose(FSDLPantalla);
   inherited;
 end;
@@ -314,7 +314,7 @@ end;
 procedure TMediaDisplay.DrawStatusInDisplay;
 const fontFile = 'F:\VIDEO_COMPONENT\Win32\Debug\arial.ttf'+#0+#0;
 var surface:PSDL_Surface;
-    font:PTTF_Font;
+    //font:PTTF_Font;
     Color:TSDL_Color;
     texture:PSDL_Texture;
 begin
@@ -363,7 +363,8 @@ var
  rect2:TSDL_Rect;
 begin  Result:=True;
  try
-  rect2:=CaslcSize(rect);
+  //rect2:=CaslcSize(rect);
+  rect2:=rect;
   if assigned(FSDLPantalla.Window.surface) then begin
    if
     (FSDLPantalla.Window.surface.w <> rect2.w{AVStream.codec.width}) or
@@ -435,6 +436,8 @@ var
 
   TicB,TicE:Cardinal;
 
+  //MyRect:TRect;
+
   rect: TSDL_Rect;
 begin
   // проверяем была ли инициализация
@@ -446,6 +449,7 @@ begin
   pix_F := AV_PIX_FMT_BGR0;
   // Задаём размеры прямоугольника в дальнейшем по мену будем считать преобразование размера кадра
   rect.x := 0; rect.y := 0;
+  //MyRect:=GetClientRect;
   rect.w := w; // шырена
   rect.h := h; // высота
   rect2:=CaslcSize(rect);
@@ -453,12 +457,12 @@ begin
   Img := av_frame_alloc(); // Создаём пространство для конвертированного кадра
   // получаем контекст для преобразования в RGBы
   ImgConvContext := nil;
-  ImgConvContext := sws_getContext(w, h, pix_fmt, rect2.W{AVStream.codec.width}, rect2.h{AVStream.codec.height}, pix_F, SWS_BILINEAR, nil, nil, nil);
+  ImgConvContext := sws_getContext(w, h, pix_fmt, rect2.W, rect2.h, pix_F, SWS_BILINEAR, nil, nil, nil);
   // Формируем буфер для картинки RGB
-  Ibmp_Size := avpicture_get_size(pix_F, rect2.w{AVStream.codec.width}, rect2.H{AVStream.codec.height});
+  Ibmp_Size := avpicture_get_size(pix_F, rect2.w, rect2.H);
   ibmp_Buff := nil;
   ibmp_Buff := av_malloc(Ibmp_Size * SizeOf(Byte));
-  res := avpicture_fill(PAVPicture(Img), ibmp_Buff, pix_F, rect2.w{AVStream.codec.width},rect2.h{AVFrame.height});
+  res := avpicture_fill(PAVPicture(Img), ibmp_Buff, pix_F, rect2.w,rect2.h);
   // конвертируем формат пикселя в RGB
   if Assigned(ImgConvContext) then res := sws_scale(ImgConvContext, @Data, @linesize, 0, h, @Img.Data, @Img.linesize);
   try
@@ -495,12 +499,6 @@ begin
   SDL_RenderPresent(FSDLPantalla^.Renderer);
   CS.Leave;
  end;
-end;
-
-procedure TMediaDisplay.Resize;
-begin
-  inherited;
-
 end;
 
 procedure TMediaDisplay.UpdateRender;
@@ -772,6 +770,8 @@ procedure TVideoThread.Execute;
 var Play:Boolean;
   GT:UInt64;
   Decoded,Render:Boolean;
+  tic1, tic2:UInt64;
+  Delay:Int64;
 
   function isTimePak:Boolean;
   var tmp:Int64;
@@ -788,7 +788,7 @@ begin
   Render:=False;
   try
     while not Self.Terminated do begin
-      Sleep(1);
+      //Sleep(15);
       if Assigned(FOnIsPlayed) and
          Assigned(FSyncTime) and
          Assigned(FOnReadPacked) and
@@ -800,6 +800,7 @@ begin
         if Play then begin
           FSyncTime(GT);
           if (not Decoded) then begin
+            tic1:=GetTickCount;
             Decoded := FOnReadPacked(FAVPacked) = 0;
             if (FAVPacked.stream_index) <> FVideoStrem.index then begin //nedd test
               Decoded:=False;
@@ -819,6 +820,10 @@ begin
                 );
                 Decoded:=False; Render:=False;
               end;
+              tic2:=GetTickCount;
+              Delay:=round((FAVPacked.duration * (FVideoStrem.time_base.num / FVideoStrem.time_base.den)* 1000))-(tic2-tic1);
+              if Delay < 0 then Delay := 0;              
+              Sleep(Delay);
             end; //is time end
           end;
         end;
