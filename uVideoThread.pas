@@ -45,6 +45,7 @@ type
     Function Ini3DCanvas(Rect:TSDL_Rect):Boolean;
     Function Free3DCanvas:Boolean;
     Function CaslcSize(Sourse:TSDL_Rect):TSDL_Rect;
+    Function SaveFrameAsJPEG(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer):Integer;
     procedure RenderVideoFrame(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer; pix_fmt:TAVPixelFormat);
   public
     FBuffer:TMediaBuffer;
@@ -342,6 +343,7 @@ var
   rect: TSDL_Rect;
 begin
  //if Assigned(CS) then CS.Enter;
+ if not Assigned(FSDLPantalla.Window) then Exit;
  try
   pix_F := AV_PIX_FMT_BGR0;
   // «адаЄм размеры пр€моугольника в дальнейшем по мену будем считать преобразование размера кадра
@@ -350,7 +352,7 @@ begin
   rect.w := w; // шырена
   rect.h := h; // высота
   rect2:=CaslcSize(rect);
-  Ini3DCanvas(rect2);
+  Ini3DCanvas(rect2{rect});
   // провер€ем была ли инициализаци€
   if {(not assigned(FSDLPantalla.Window.surface)) OR }(not assigned(MooseTexture)) then begin
     Exit;
@@ -369,15 +371,25 @@ begin
   if Assigned(ImgConvContext) then res := sws_scale(ImgConvContext, @Data, @linesize, 0, h, @Img.Data, @Img.linesize);
   try
     // рисуем картинку на текстуре
+    //Ini3DCanvas(rect2);
+    if FAVFrame.pict_type <> AV_PICTURE_TYPE_NONE then begin
+     SaveFrameAsJPEG(rect2.w, rect2.H,Img.Data[0], Img.linesize[0]);
+    end;
     res := SDL_UpdateTexture(MooseTexture, @rect2, @Img.Data[0]^, Img.linesize[0]);
-    if res = 0 then
+    if res = 0 then begin
     //SDL_RenderClear(FSDLPantalla^.Renderer);
     // копируем картинку с текстуры в рендер
     //if (*FProportionally*) true then begin
+    //TicB:=GetTickCount;
       res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture,
-        nil, // — какой области скопировать кадр
-        @rect2 // Ќа какой размер раст€нуть кадр
+        nil,// — какой области скопировать кадр
+        nil//@rect // Ќа какой размер раст€нуть кадр
         );
+    //TicE:=GetTickCount;
+    //OutputDebugString(PWideChar('SDL_RenderCopy ms:'+IntToStr(TicE - TicB)));
+    end;
+    if res <> 0 then
+      raise Exception.Create('SDL Error Message : '+SDL_GetError());
     (*end else begin
       res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture,
         @rect,// — какой области скопировать кадр
@@ -403,6 +415,49 @@ begin
   SDL_RenderPresent(FSDLPantalla^.Renderer);
   //if Assigned(CS) then CS.Leave;
  end;
+end;
+
+function TVideoThread.SaveFrameAsJPEG(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer): Integer;
+var
+  BMPFile:TFileStream;
+  BMPHeader:BITMAPFILEHEADER;
+  BMPInfo:TBitmapV4Header;
+  ret:Integer;
+begin Result:=0;
+  bmpheader.bfReserved1 := 0;
+  bmpheader.bfReserved2 := 0;
+  bmpheader.bfType := $4d42;
+  bmpheader.bfOffBits := sizeof(BITMAPFILEHEADER) + sizeof(BITMAPV4HEADER);
+  bmpheader.bfSize := bmpheader.bfOffBits + w*h*32 div 8;
+
+  bmpinfo.bV4Size := sizeof(BITMAPV4HEADER);
+  bmpinfo.bV4Width := w;
+  bmpinfo.bV4Height := -h;
+  bmpinfo.bV4Planes := 1;
+  bmpinfo.bV4BitCount := 32;//24;
+  bmpinfo.bV4V4Compression := BI_BITFIELDS;
+  bmpinfo.bV4SizeImage := 0;
+  bmpinfo.bV4XPelsPerMeter := 100;//2835; // ResolutionHorizontal
+  bmpinfo.bV4YPelsPerMeter := 100;//2835; //ResolutionVertical
+  bmpinfo.bV4ClrUsed := 0;
+  bmpinfo.bV4ClrImportant := 0;
+  BMPInfo.bV4RedMask:=$00FF0000;
+  BMPInfo.bV4GreenMask:=$0000FF00;
+  BMPInfo.bV4BlueMask:=$000000FF;
+  BMPInfo.bV4AlphaMask:=$FF000000;
+  BMPInfo.bV4CSType:=$206E6957;
+  BMPInfo.bV4GammaRed:=0;
+  BMPInfo.bV4GammaGreen:=0;
+  BMPInfo.bV4GammaBlue:=0;
+
+  BMPFile:=TFileStream.Create(ExtractFilePath(GetCurrentDir)+'TEST'+IntToStr(Random(500))+'.jpg',fmCreate);
+  try
+    BMPFile.WriteBuffer(bmpheader,SizeOf(bmpheader));
+    BMPFile.WriteBuffer(bmpinfo,SizeOf(bmpinfo));
+    BMPFile.WriteBuffer(data[0]^,w*h*32 div 8);
+  finally
+    FreeAndNil(BMPFile);
+  end;
 end;
 
 procedure TVideoThread.SetSDL(SDLPantalla: PSDLPantalla);

@@ -143,7 +143,7 @@ begin
         FSDLPantalla.max_texture_height := FRenderInfo^.max_texture_height;
         FSDLPantalla.hardware :=
           ((FRenderInfo.Flags and SDL_RENDERER_ACCELERATED) > 0);
-        FSDLPantalla.render_name := FRenderInfo^.name;
+        FSDLPantalla.render_name := PChar('Render_Video');//FRenderInfo^.name;
         // PAnsiChar(FRenderInfo.name);
         SDL_ShowWindow(FSDLPantalla.Window);
         if SDL_SetRenderDrawColor(FSDLPantalla^.Renderer, 0, 0, 0,

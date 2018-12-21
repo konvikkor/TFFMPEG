@@ -518,9 +518,10 @@ begin
             if pack.stream_index = FMediaDecoder.FVideoIdx then begin
               repeat
                Sleep(1);
+               //Application.ProcessMessages;
                if not Assigned(FVideo[v]) then Break;
                if (Terminated) or (not Play) then Break;
-              until (FVideo[v].FBuffer.GetCount <= FVideo[v].FBuffer.GetSize-1);
+              until (FVideo[v].FBuffer.GetCount < FVideo[v].FBuffer.GetSize-1);
               if Assigned(FVideo[v]) then
               //if FVideo[v].FBuffer.GetSize < High(FVideo[v].FBuffer.FBuffer)-1 then begin
                FVideo[v].FBuffer.WriteData(Pointer(pack));
