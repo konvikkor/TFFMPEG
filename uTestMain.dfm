@@ -2,8 +2,8 @@ object Form1: TForm1
   Left = 0
   Top = 0
   Caption = 'Form1'
-  ClientHeight = 325
-  ClientWidth = 701
+  ClientHeight = 233
+  ClientWidth = 600
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,17 +18,21 @@ object Form1: TForm1
   object PageControl1: TPageControl
     Left = 0
     Top = 0
-    Width = 701
-    Height = 306
-    ActivePage = TabSheet1
+    Width = 600
+    Height = 214
+    ActivePage = TabSheet2
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
       Caption = 'LOG'
+      ExplicitLeft = 0
+      ExplicitTop = 0
+      ExplicitWidth = 0
+      ExplicitHeight = 0
       object Splitter1: TSplitter
-        Left = 505
+        Left = 404
         Top = 0
-        Height = 278
+        Height = 186
         Align = alRight
         ExplicitLeft = 240
         ExplicitTop = 128
@@ -37,7 +41,7 @@ object Form1: TForm1
       object Splitter2: TSplitter
         Left = 185
         Top = 0
-        Height = 278
+        Height = 186
         ExplicitLeft = 256
         ExplicitTop = 112
         ExplicitHeight = 100
@@ -45,8 +49,8 @@ object Form1: TForm1
       object Memo1: TMemo
         Left = 188
         Top = 0
-        Width = 317
-        Height = 278
+        Width = 216
+        Height = 186
         Align = alClient
         Lines.Strings = (
           'Memo1')
@@ -54,10 +58,10 @@ object Form1: TForm1
         TabOrder = 0
       end
       object Memo2: TMemo
-        Left = 508
+        Left = 407
         Top = 0
         Width = 185
-        Height = 278
+        Height = 186
         Align = alRight
         Lines.Strings = (
           'Memo2')
@@ -68,7 +72,7 @@ object Form1: TForm1
         Left = 0
         Top = 0
         Width = 185
-        Height = 278
+        Height = 186
         Align = alLeft
         Lines.Strings = (
           'Memo3')
@@ -83,8 +87,8 @@ object Form1: TForm1
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 306
-    Width = 701
+    Top = 214
+    Width = 600
     Height = 19
     Panels = <
       item
@@ -131,6 +135,8 @@ object Form1: TForm1
     Top = 48
   end
   object Timer1: TTimer
+    Interval = 500
+    OnTimer = Timer1Timer
     Left = 132
     Top = 40
   end

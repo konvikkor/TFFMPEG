@@ -5,7 +5,7 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, uVideoMain, Vcl.Menus, Vcl.ComCtrls,
-  Vcl.StdCtrls, Vcl.ExtCtrls, System.DateUtils;
+  Vcl.StdCtrls, Vcl.ExtCtrls, System.DateUtils, uMediaDisplay;
 
 type
   TForm1 = class(TForm)
@@ -33,8 +33,10 @@ type
     procedure FormCreate(Sender: TObject);
     procedure EST1Click(Sender: TObject);
     procedure Play1Click(Sender: TObject);
+    procedure Timer1Timer(Sender: TObject);
   private
     { Private declarations }
+    procedure OnError(Sender:TObject; ErrorCode:Integer; MSG:string);
   public
     { Public declarations }
     Media:TMediaDecoder;
@@ -118,6 +120,11 @@ begin
   MediaDisplay.Align:=alClient;
 end;
 
+procedure TForm1.OnError(Sender: TObject; ErrorCode: Integer; MSG: string);
+begin
+ Memo3.Lines.Add(MSG);
+end;
+
 procedure TForm1.Open1Click(Sender: TObject);
 var i:Integer;
 begin
@@ -126,12 +133,20 @@ begin
  else Media.CloseFile;
  Media.OpenFile(OpenDialog1.FileName);
  Media.Display:=MediaDisplay;
+ Media.OnError:=OnError;
 end;
 
 procedure TForm1.Play1Click(Sender: TObject);
 begin
   if not Assigned(Media) then exit;
   Media.Start;
+end;
+
+procedure TForm1.Timer1Timer(Sender: TObject);
+begin
+  if Assigned(Media) then StatusBar1.Panels[0].Text:='[C]'+Media.GetCurrentTime;
+  if Assigned(Media) then StatusBar1.Panels[1].Text:='[B]'+Media.GetBufferTime;
+  //if Assigned(Media) then StatusBar1.Panels[1].Text:='[T]'+Media.GetBufferTime;
 end;
 
 end.

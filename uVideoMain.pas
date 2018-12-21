@@ -5,6 +5,8 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
   System.Classes, Vcl.Graphics,
+  (* Media modules *)
+  uMediaDisplay,uMediaConstant,
 
   Vcl.ExtCtrls,Math,System.SyncObjs,System.Generics.Collections,
 
@@ -19,68 +21,10 @@ uses
   libavutil_mathematics, libavutil_md5, libavutil_mem, libavutil_motion_vector,
   libavutil_opt, libavutil_parseutils, libavutil_pixdesc, libavutil_pixfmt,
   libavutil_rational, libavutil_samplefmt, libavutil_time, libavutil_timestamp,
-  libswresample, libswscale, sdl2, {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading;
-
-const
-  MAX_AUDIO_FRAME_SIZE = 192000; // 1 second of 48khz 32bit audio
-  MODULE_VERSION = '2.0';
-  //WM_DecodeFrame = WM_USER+0;
-  //WM_PlayFrame = WM_USER+1;
-  //WM_StopFrame = WM_USER+2;
-  //WM_FreeFrame = WM_USER+3;
-  //WM_PlayFrame = WM_USER+4;
-  //WM_PlayFrame = WM_USER+5;
-  //WM_PlayFrame = WM_USER+6;
+  libswresample, libswscale, sdl2, {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading,
+  uVideoThread;
 
 type
-  TOnError = procedure (Sender:TObject; ErrorCode:Integer; MSG:string) of object;
-
-  TMediaBufferInfo = packed Record
-    AVStream  : PAVStream;
-    AVPacket  : PAVPacket;//TAVPacket;
-    AVFrame   : PAVFrame;//TAVFrame;
-    GotFrame  : PInteger;
-  End;
-  PMediaBufferInfo = ^TMediaBufferInfo;
-
-  TMediaDisplay = class (TCustomPanel)
-  private
-    FSDLPantalla: PSDLPantalla;
-    FFlags: UInt32;
-    FRenderInfo: PSDL_RendererInfo;
-    MooseTexture: PSDL_Texture;
-    FProportionally: Boolean;
-    Timer: TTimer;
-    CS:TCriticalSection;
-    procedure CreateWnd; override;
-    procedure DestroyWnd; override;
-    procedure OnTimer(Sender:TObject);
-    procedure CanResize (Sender: TObject; var NewWidth, NewHeight: Integer; var Resize: Boolean);
-    Function Ini3DCanvas(Rect:TSDL_Rect):Boolean;
-    Function Free3DCanvas:Boolean;
-    procedure DrawStatusInDisplay;
-  protected
-    procedure Paint; override;
-    Function CaslcSize(Sourse:TSDL_Rect):TSDL_Rect;
-    procedure OnRenderVideo(var Data:PMediaBufferInfo);
-  public
-    constructor Create(AOwner: TComponent); override;
-    destructor Destroy; override;
-    procedure UpdateRender;
-    procedure RenderVideoFrame(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer; pix_fmt:TAVPixelFormat);
-  published
-    property Anchors;
-    property OnContextPopup;
-    property PopupMenu;
-    property OnResize;
-    property OnDblClick;
-    property OnClick;
-    property OnKeyUp;
-    property OnKeyPress;
-    property OnKeyDown;
-    property Align;
-  end;
-
   TMediaCore = class(TComponent)
   private
     FDisplay: TMediaDisplay;
@@ -90,18 +34,24 @@ type
     (*Global File*)
     FAVFormatContext:PAVFormatContext;
     FAVPacket:PAVPacket;
+    CurrentTime:Ttime;
+    BufferTime:Ttime;
     (*Video*)
     FVideoIdx:Integer;
     FVideoStrem:PAVStream;
     FVideoFrame:PAVFrame;
     FVideoGotFrame:PInteger;
+    LastVideoThreadRead:Integer;
+    FVideoBuffer:TMediaBuffer;
   public
     Constructor Create;
     Destructor Destroy; override;
     Function ReadPacked:Integer;overload;
     Function ReadPacked(var Pack:PAVPacket):Integer;overload;
+    Function ReadPacked(Sender:TObject;var Pack:PAVPacket):Integer;overload;
+    function ReadVideoPacked(Sender:TObject;var Pack:Pointer):Integer;
     Function DecodeVideo:Integer;overload;
-    Function DecodeVideo(var Pack:PAVPacket; var Frame:PAVFrame; Var Gotframe:PInteger):Integer;overload;
+    Function DecodeVideo(Sender:TObject;var Pack:PAVPacket; var Frame:PAVFrame; Var Gotframe:PInteger):Integer;overload;
     Function SeekTS(StreamID:Integer;TS:UInt64):Integer;
     Function OpenFile(FileName:TFileName):Integer;
     Function CloseFile:Boolean;
@@ -110,32 +60,28 @@ type
     Property OnError:TOnError read FOnError Write FOnError;
   end;
 
-  TOnSyncTime = procedure (var GlobalTime:UInt64) of object;
-  TOnDecodeVideo = function (var Pack:PAVPacket; var Frame:PAVFrame; Var Gotframe:PInteger):Integer of object;
-  TOnReadPacked = Function (var Pack:PAVPacket):Integer of object;
-  TOnRenderVideoFrame = procedure (w,h:SInt32;Data:Array of PByte;linesize: Array of Integer; pix_fmt:TAVPixelFormat) of object;
-  TOnIsPlayed = Procedure (var Play:Boolean)of object;
+  TMediaDecoder = class;
 
-  TVideoThread = class(TThread)
+  TMediaReader = class (TThread)
   private
-    FSyncTime: TOnSyncTime;
-    FOnDecodeFrame: TOnDecodeVideo;
-    FOnReadPacked: TOnReadPacked;
-    FOnRenderVideoFrame: TOnRenderVideoFrame;
     FOnIsPlayed: TOnIsPlayed;
+    FOnError: TOnError;
+    FOnReadVideoPacked: TOnReadVideoPacked;
+    FOnDecodeFrame: TOnDecodeVideo;
+    FSyncTime: TOnSyncTime;
+    FOnRenderVideoFrame: TOnRenderVideoFrame;
   protected
-    FVideoStrem:PAVStream;
-    FAVPacked:PAVPacket;
-    FAVFrame:PAVFrame;
-    FGotFrame:PInteger;
+    FVideo:Array [0..1] of TVideoThread;
+    FMediaDecoder:TMediaDecoder;
     procedure Execute; override;
-  public
-    constructor Create(FVideoStrem:PAVStream);
+  published
+    constructor Create(MediaDecoder:TMediaDecoder);
     Property OnSyncTime:TOnSyncTime read FSyncTime Write FSyncTime;
     Property OnDecodeFrame:TOnDecodeVideo read FOnDecodeFrame Write FOnDecodeFrame;
-    property OnReadPacked:TOnReadPacked read FOnReadPacked Write FOnReadPacked;
+    property OnReadVideoPacked:TOnReadVideoPacked read FOnReadVideoPacked Write FOnReadVideoPacked;
     property OnRenderVideoFrame:TOnRenderVideoFrame read FOnRenderVideoFrame Write FOnRenderVideoFrame;
     property OnIsPlayed:TOnIsPlayed read FOnIsPlayed write FOnIsPlayed;
+    property OnError:TOnError Read FOnError Write FOnError;
   end;
 
   TMediaDecoder = class(TMediaCore)
@@ -143,17 +89,22 @@ type
     FPlay: Boolean;
     GlobalTime:UInt64;
     StartTime:UInt64;
+    StartT:TTime;
     Timer:TTimer;
+    Last_pts:Int64;
   protected
-    FVideo:TVideoThread;
+    //FVideo:Array [0..0] of TVideoThread;
+    FMediaReader:TMediaReader;
     Procedure OnTimer(sender:TObject);
-    procedure OnIsPlayed(var Play:Boolean);
-    procedure OnSyncTime(var GT:UInt64);
+    procedure OnIsPlayed(Sender:TObject;var Play:Boolean);
+    procedure OnSyncTime(Sender:TObject;var GT:UInt64; Pack:PAVPacket; var Delay:Int64);
   public
     constructor Create;
     destructor Destroy;
     function Start:Boolean;
     property Play:Boolean Read FPlay default false;
+    function GetCurrentTime:string;
+    Function GetBufferTime:string;
   end;
 
 function DurationToStr(ADuration: Int64): string;
@@ -177,342 +128,6 @@ begin
   end
   else
     Result := 'N/A';
-end;
-
-{ TMediaDisplay }
-
-procedure TMediaDisplay.CanResize(Sender: TObject; var NewWidth,
-  NewHeight: Integer; var Resize: Boolean);
-var Rect:TSDL_Rect;
-begin
-  CS.Enter;
-  try
-    Rect.x:=0; Rect.y:=0; Rect.w:=NewWidth; Rect.h:=NewHeight;
-    Resize:=Ini3DCanvas(Rect);
-  finally
-    CS.Leave;
-  end;
-end;
-
-function TMediaDisplay.CaslcSize(Sourse: TSDL_Rect): TSDL_Rect;
-var rect:TSDL_Rect;
-    p:Double;
-begin
-  if not Assigned(FSDLPantalla.Renderer) then Exit;
-  SDL_RenderGetViewport(FSDLPantalla.Renderer,@rect);
-  Result.x := 0;
-  Result.y := 0;
-  p := (rect.w * 100) / Sourse.w;
-  Result.w := round((Sourse.w * p) / 100);
-  Result.h := round((Sourse.h * p) / 100);
-  if Result.h > rect.h then
-  begin
-   p := (rect.h * 100) / Result.h;
-   Result.w := round((Result.w * p) / 100);
-   Result.h := round((Result.h * p) / 100);
-  end;
-end;
-
-constructor TMediaDisplay.Create(AOwner: TComponent);
-begin
-  inherited;
-  CS:=TCriticalSection.Create;
-  Self.Height:=200;
-  Self.Width:=200;
-  Self.Align:=alNone;
-  Self.OnCanResize:=CanResize;
-  Timer:=TTimer.Create(nil);
-  Timer.Interval:=20;
-  Timer.OnTimer:=OnTimer;
-  Timer.Enabled:=True;
-  FProportionally:=True;
-end;
-
-procedure TMediaDisplay.CreateWnd;
-begin
-  inherited;
-  if SDL_WasInit(SDL_INIT_VIDEO) <> SDL_INIT_VIDEO then
-    SDL_InitSubSystem(SDL_INIT_VIDEO);
-  (*if TTF_Init = 0 then begin
-   if not TTF_WasInit() then begin
-     raise Exception.Create('Error Message [TTF_WasInit]:'+TTF_GetError());
-   end;
-  end else begin
-    raise Exception.Create('Error Message [TTF_Init]:'+TTF_GetError());
-  end;*)
-  New(FSDLPantalla);
-  FSDLPantalla.Window := SDL_CreateWindowFrom(Pointer(Self.Handle));
-  if FSDLPantalla.Window <> nil then
-  begin
-    FSDLPantalla.Renderer := SDL_CreateRenderer(FSDLPantalla^.Window, -1, 0);
-    // no forzamos ningъn tipo de render (0) para que el sistema coja el que pueda Hard-Soft
-    if FSDLPantalla.Renderer <> nil then
-    begin
-      New(FRenderInfo);
-      if SDL_GetRendererInfo(FSDLPantalla^.Renderer, FRenderInfo) = 0 then
-      begin
-        FSDLPantalla.max_texture_width := FRenderInfo^.max_texture_width;
-        FSDLPantalla.max_texture_height := FRenderInfo^.max_texture_height;
-        FSDLPantalla.hardware :=
-          ((FRenderInfo.Flags and SDL_RENDERER_ACCELERATED) > 0);
-        FSDLPantalla.render_name := FRenderInfo^.name;
-        // PAnsiChar(FRenderInfo.name);
-        SDL_ShowWindow(FSDLPantalla.Window);
-        if SDL_SetRenderDrawColor(FSDLPantalla^.Renderer, 0, 0, 0,
-          SDL_ALPHA_OPAQUE) = 0 then
-        begin
-          if SDL_RenderFillRect(FSDLPantalla^.Renderer, nil) = 0 then
-            FFlags := SDL_GetWindowFlags(FSDLPantalla.Window)
-          else
-            raise Exception.Create('Error clearing render context');
-        end
-        else
-          raise Exception.Create('Error setting render draw color');
-      end
-      else
-        raise Exception.Create('Error getting information about rendering context');
-
-    end
-    else
-      raise Exception.Create('Error crearting SDL2 Render');
-
-  end
-  else
-    raise Exception.Create('Error creating SDL2 Window.');
-  //Self.OnResize:=Resize;
-  //Timer := TTimer.Create(Self);
-  //Timer.OnTimer := OnTimer;
-  //Timer.Interval := 20; // обновление полотна
-  //Timer.Enabled := True;
-end;
-
-destructor TMediaDisplay.Destroy;
-begin
-  FreeAndNil(CS);
-  inherited;
-end;
-
-procedure TMediaDisplay.DestroyWnd;
-begin
-  //FreeAndNil(Timer);
-  Timer.Enabled := False;
-  if FSDLPantalla.Renderer <> nil then
-  begin
-    SDL_DestroyRenderer(FSDLPantalla.Renderer);
-    FSDLPantalla.Renderer := nil;
-  end;
-  if FSDLPantalla.Window <> nil then
-  begin
-    SDL_DestroyWindow(FSDLPantalla.Window);
-    FSDLPantalla.Window := nil;
-  end;
-  //TTF_Quit;
-  Dispose(FSDLPantalla);
-  inherited;
-end;
-
-procedure TMediaDisplay.DrawStatusInDisplay;
-const fontFile = 'F:\VIDEO_COMPONENT\Win32\Debug\arial.ttf'+#0+#0;
-var surface:PSDL_Surface;
-    //font:PTTF_Font;
-    Color:TSDL_Color;
-    texture:PSDL_Texture;
-begin
- (* Default render screen *) 
- if FSDLPantalla = nil then Exit; 
- if FSDLPantalla.Renderer = nil then exit;
- CS.Enter;
- try
-  {font:=SDL2_ttf.TTF_OpenFont(fontFile,25);
-  if font = nil then begin
-    raise Exception.Create('Error Message:'+(TTF_GetError()));
-    Exit;
-  end;
-  Color.r:=255;
-  Color.g:=0;
-  Color.b:=0;
-  Color.unused:=150;
-  surface:=TTF_RenderText_Blended(font,PWideChar('TEST'),color);
-  texture:=SDL_CreateTextureFromSurface(FSDLPantalla.Renderer,surface);
-  SDL_RenderCopy(FSDLPantalla.Renderer,texture,nil,nil);
-  UpdateRender;
-  SDL_DestroyTexture(texture);}
- finally
-   CS.Leave;
- end;
-end;
-
-function TMediaDisplay.Free3DCanvas: Boolean;
-begin Result:=True;
- try
-  if assigned(MooseTexture) then begin
-    SDL_DestroyTexture(MooseTexture);
-    MooseTexture:=nil;
-  end;
-  if assigned(FSDLPantalla.Window.surface) then begin
-    SDL_FreeSurface(FSDLPantalla.Window.surface);
-    FSDLPantalla.Window.surface:=nil;
-  end;
- except
-  Result:=False;
- end;
-end;
-
-function TMediaDisplay.Ini3DCanvas(Rect: TSDL_Rect): Boolean;
-var
- rect2:TSDL_Rect;
-begin  Result:=True;
- try
-  //rect2:=CaslcSize(rect);
-  rect2:=rect;
-  if assigned(FSDLPantalla.Window.surface) then begin
-   if
-    (FSDLPantalla.Window.surface.w <> rect2.w{AVStream.codec.width}) or
-    (FSDLPantalla.Window.surface.h <> rect2.h{AVStream.codec.height}) then
-     Free3DCanvas;
-  end;
-  // Создаём текстуру для отображения кадра
-  if not assigned(FSDLPantalla.Window.surface) then
-    FSDLPantalla.Window.surface := SDL_CreateRGBSurface(0, rect2.w{AVStream.codec.width},
-      rect2.h{AVStream.codec.height}, 24, $000000FF, $0000FF00, $00FF0000, $00000000);
-  if not assigned(MooseTexture) then
-    MooseTexture := SDL_CreateTextureFromSurface(FSDLPantalla.Renderer,
-      FSDLPantalla.Window.surface);
- except
-   Result:=False;
- end;
-end;
-
-procedure TMediaDisplay.OnRenderVideo(var Data: PMediaBufferInfo);
-begin
- if Data^.AVFrame = nil then Exit;
- RenderVideoFrame(
-    Data^.AVFrame.width,
-    Data^.AVFrame.height,
-    Data^.AVFrame.data,
-    Data^.AVFrame.linesize,
-    Data^.AVStream.codec.pix_fmt
- );
-end;
-
-procedure TMediaDisplay.OnTimer(Sender: TObject);
-var Rect:TSDL_Rect;  
-  R:TRect;
-begin
- if FSDLPantalla <> nil then begin 
-   if FSDLPantalla.Window.surface = nil then begin   
-     r:=GetClientRect;
-     Ini3DCanvas(TSDL_Rect(R));
-   end;
- end;
- (* Default render screen *)
- DrawStatusInDisplay;
- UpdateRender;
-end;
-
-procedure TMediaDisplay.Paint;
-var Rect: TRect;
-begin
-  //inherited; //?
-  (* Message Pain frame *)
-  Rect := GetClientRect;
-  with Canvas do begin
-    Brush.Color:=clBlack;
-    FillRect(Rect);
-  end;
-end;
-
-procedure TMediaDisplay.RenderVideoFrame(w, h: SInt32; Data: array of PByte;
-  linesize: array of Integer; pix_fmt:TAVPixelFormat);
-var
-  res: SInt32;
-  ImgConvContext: PSwsContext;
-  Img: PAVFrame;
-  Ibmp_Size: Integer;
-  ibmp_Buff: PByte;
-  pix_F: TAVPixelFormat;
-  rect2, rect3: TSDL_Rect;
-  p: Real;
-
-  TicB,TicE:Cardinal;
-
-  //MyRect:TRect;
-
-  rect: TSDL_Rect;
-begin
-  // проверяем была ли инициализация
- if (not assigned(FSDLPantalla.Window.surface)) OR (not assigned(MooseTexture)) then begin
-   Exit;
- end;
- CS.Enter;
- try
-  pix_F := AV_PIX_FMT_BGR0;
-  // Задаём размеры прямоугольника в дальнейшем по мену будем считать преобразование размера кадра
-  rect.x := 0; rect.y := 0;
-  //MyRect:=GetClientRect;
-  rect.w := w; // шырена
-  rect.h := h; // высота
-  rect2:=CaslcSize(rect);
-  // Очистка от предыдущий ошибок
-  Img := av_frame_alloc(); // Создаём пространство для конвертированного кадра
-  // получаем контекст для преобразования в RGBы
-  ImgConvContext := nil;
-  ImgConvContext := sws_getContext(w, h, pix_fmt, rect2.W, rect2.h, pix_F, SWS_BILINEAR, nil, nil, nil);
-  // Формируем буфер для картинки RGB
-  Ibmp_Size := avpicture_get_size(pix_F, rect2.w, rect2.H);
-  ibmp_Buff := nil;
-  ibmp_Buff := av_malloc(Ibmp_Size * SizeOf(Byte));
-  res := avpicture_fill(PAVPicture(Img), ibmp_Buff, pix_F, rect2.w,rect2.h);
-  // конвертируем формат пикселя в RGB
-  if Assigned(ImgConvContext) then res := sws_scale(ImgConvContext, @Data, @linesize, 0, h, @Img.Data, @Img.linesize);
-  try
-    // рисуем картинку на текстуре
-    res := SDL_UpdateTexture(MooseTexture, @rect2, @Img.Data[0]^, Img.linesize[0]);
-    SDL_RenderClear(FSDLPantalla^.Renderer);
-    // копируем картинку с текстуры в рендер
-    if FProportionally then begin
-      res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture,
-        nil, // С какой области скопировать кадр
-        @rect2 // На какой размер растянуть кадр
-        );
-    end else begin
-      res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture,
-        @rect,// С какой области скопировать кадр
-        nil   // На какой размер растянуть кадр
-        );
-    end;
-    // Отображаем картинку в рендере
-    //if AVStream.avg_frame_rate.den > 0 then res:=Trunc(av_q2d(AVStream.avg_frame_rate))-((TicE-TicB)+DeleyTime);
-  except
-    on E: Exception do begin
-      //Result := False;
-    end;
-  end;
- finally
-  // очистка памяти от временного мусора
-  av_free(ibmp_Buff);
-  //av_freep(ibmp_Buff);
-  sws_freeContext(ImgConvContext);
-  //av_frame_unref(@Img);
-  av_frame_free(@Img);
-  Application.ProcessMessages;
-  SDL_RenderPresent(FSDLPantalla^.Renderer);
-  CS.Leave;
- end;
-end;
-
-procedure TMediaDisplay.UpdateRender;
-begin
- if Assigned(FSDLPantalla) then begin
-  if Assigned(FSDLPantalla^.Renderer) then begin
-   CS.Enter;
-   try
-    SDL_RenderPresent(FSDLPantalla^.Renderer);
-   finally
-     CS.Leave;
-   end;
-  end;
- end;
 end;
 
 { TMediaCore }
@@ -551,10 +166,10 @@ begin
   end;
 end;
 
-function TMediaCore.DecodeVideo(var Pack: PAVPacket; var Frame: PAVFrame;
+function TMediaCore.DecodeVideo(Sender:TObject;var Pack: PAVPacket; var Frame: PAVFrame;
   var Gotframe: PInteger): Integer;
 begin
- CS.Enter;
+ if Assigned(CS) then CS.Enter;
  try
   Result := avcodec_decode_video2(FVideoStrem^.codec, Frame, Gotframe, Pack);
   if (Result < 0) then
@@ -562,7 +177,7 @@ begin
     if Assigned(FOnError) then FOnError(Self,Result,'DecodeVideo : '+av_err2str(Result));
   end;
  finally
-   CS.Leave;
+   if Assigned(CS) then CS.Leave;
  end;
 end;
 
@@ -631,6 +246,7 @@ begin opts:=nil;
      Steams[i].bufsize := ret;*)
     end;
   end;
+  FVideoStrem:=PPtrIdx(FAVFormatContext.streams, FVideoIdx);
   {* инициализация глобальных переменных *}
   (*FEndposition.TimeInt:=FormatContext.duration;
   FEndposition.ts := Round(FEndposition.TimeInt * av_q2d(Steams[video_stream_idx].stream.time_base));
@@ -640,18 +256,59 @@ begin opts:=nil;
  end;
 end;
 
-function TMediaCore.ReadPacked(var Pack: PAVPacket): Integer;
+function TMediaCore.ReadPacked(Sender:TObject;var Pack: PAVPacket): Integer;
 begin
- cs.Enter;
+ //if Assigned(CS) then CS.Enter;
  try
   Result := av_read_frame(FAVFormatContext, Pack);
-  if Result < 0 then
-  begin
+  if Result < 0 then begin
    av_packet_unref(Pack);
    if Assigned(FOnError) then FOnError(Self,Result,'ReadPacked : '+av_err2str(Result));
+  end else begin
+    if (Sender is TVideoThread) then begin
+      LastVideoThreadRead:=(Sender as TVideoThread).Tag;
+    end;
   end;
  finally
-   CS.Leave;
+  //if Assigned(CS) then CS.Leave;
+ end;
+end;
+
+function TMediaCore.ReadPacked(var Pack: PAVPacket): Integer;
+begin
+ //if Assigned(CS) then CS.Enter;
+ try
+  if Pack = nil then Pack:=av_packet_alloc;
+  Result := av_read_frame(FAVFormatContext, Pack);
+  //OutputDebugString(PWideChar('ReadPacked:'+inttoStr(Result)));
+  if Result < 0 then begin
+   av_packet_unref(Pack);
+   if Assigned(FOnError) then FOnError(Self,Result,'ReadPacked : '+av_err2str(Result));
+  end else begin
+   if Pack.pts <> AV_NOPTS_VALUE then begin
+     if Pack.dts > 0 then BufferTime:=IncMilliSecond(MinDateTime,(Round((Pack.dts * av_q2d(FVideoStrem.time_base)) * 1000)))
+     else BufferTime:= EncodeTime(0,0,0,0);
+   end;
+  end;
+ finally
+  //if Assigned(CS) then CS.Leave;
+ end;
+end;
+
+function TMediaCore.ReadVideoPacked(Sender: TObject;
+  var Pack: Pointer): Integer;
+begin
+ if Assigned(CS) then CS.Enter;
+ try
+  Result:=FVideoBuffer.ReadData(Pack);
+  if Pack <> nil then begin
+   if PAVPacket(Pack).pts <> AV_NOPTS_VALUE then begin
+     if PAVPacket(Pack).dts > 0 then CurrentTime:=IncMilliSecond(MinDateTime,(Round((PAVPacket(Pack).dts * av_q2d(FVideoStrem.time_base)) * 1000)))
+     else CurrentTime:= EncodeTime(0,0,0,0);
+   end;
+  end;
+ finally
+   if Assigned(CS) then CS.Leave;
  end;
 end;
 
@@ -699,6 +356,7 @@ end;
 constructor TMediaDecoder.Create;
 begin
   inherited;
+  FVideoBuffer:=TMediaBuffer.Create();
   Timer:=TTimer.Create(self);
   Timer.Enabled:=False;
   Timer.OnTimer:=OnTimer;
@@ -710,23 +368,56 @@ begin
   inherited;
 end;
 
-procedure TMediaDecoder.OnIsPlayed(var Play: Boolean);
+function TMediaDecoder.GetBufferTime: string;
 begin
- CS.Enter;
+  Result:='';
+  //Result:=FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,GlobalTime));
+  //Result:=Result+'-';
+  Result:=Result+FormatDateTime('hh.mm.ss.zzz',BufferTime);
+end;
+
+function TMediaDecoder.GetCurrentTime: string;
+begin
+  Result:='';
+  //Result:=FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,GlobalTime));
+  //Result:=Result+'-';
+  Result:=Result+FormatDateTime('hh.mm.ss.zzz',CurrentTime);
+end;
+
+procedure TMediaDecoder.OnIsPlayed(Sender:TObject;var Play: Boolean);
+begin
+ //CS.Enter;
  try
-  Play:=Self.FPlay;
+  (*if (Sender is TVideoThread) then begin
+    Play := (LastVideoThreadRead <> TVideoThread(Sender).Tag) and Self.FPlay;
+  end else begin *)
+   Play:=Self.FPlay;
+  //end;
  finally
-   CS.Leave;
+   //CS.Leave;
  end;
 end;
 
-procedure TMediaDecoder.OnSyncTime(var GT: UInt64);
+procedure TMediaDecoder.OnSyncTime(Sender:TObject;var GT: UInt64; Pack:PAVPacket; var Delay:Int64);
 begin
- CS.Enter;
+ if Assigned(CS) then CS.Enter;
  try
   GT:=GlobalTime;
+  (* Test Delay Frame to Frame *)
+  //Delay:= pack.pts - Last_pts; (* Fail *)
+  (* Test Delay Duration *)
+  if Pack.stream_index = FVideoIdx then begin
+   //FVideoStrem.r_frame_rate;
+   Delay:= Ceil(
+                  (pack.duration * av_q2d(FVideoStrem.time_base))*1000
+                );
+   //Delay:=int64(FVideoStrem.r_frame_rate.den);
+  end else Delay:=0;
+  if Delay < 0 then Delay:=0;
+  (* Test Result ??? *)
+  Last_pts:=pack.pts;
  finally
-   CS.Leave;
+   if Assigned(CS) then CS.Leave;
  end;
 end;
 
@@ -734,105 +425,129 @@ procedure TMediaDecoder.OnTimer(sender: TObject);
 begin
  CS.Enter;
  try
-  GlobalTime:=av_gettime - StartTime;
-  //Inc(GlobalTime,Timer.Interval);
+  try
+   GlobalTime:=MilliSecondsBetween(Time,StartT);
+  except
+    on E:Exception do begin
+      if Assigned(FOnError) then begin
+        FOnError(self,-1,'[Timer:TMediaDecoder] '+e.Message);
+      end;
+    end;
+  end;
  finally
    CS.Leave;
  end;
 end;
 
 function TMediaDecoder.Start: Boolean;
+var i:Integer;
 begin Result:=False;
   FPlay:=False;
   if not Assigned(FDisplay) then Exit;
-  if not Assigned(FVideo) then FVideo:=TVideoThread.Create(FVideoStrem);
-  GlobalTime:=0;
-  Timer.Interval:=10;
-  FVideo.FOnDecodeFrame:=DecodeVideo;
-  FVideo.FOnRenderVideoFrame:=FDisplay.RenderVideoFrame;
-  FVideo.FOnReadPacked:=ReadPacked;
-  FVideo.FOnIsPlayed:=OnIsPlayed;
-  FVideo.FSyncTime:=OnSyncTime;
-  StartTime:=av_gettime;
-  FPlay:=True;
-  Timer.Enabled:=FPlay;
-end;
-
-{ TVideoThread }
-
-constructor TVideoThread.Create(FVideoStrem:PAVStream);
-begin
-  inherited Create(False);
-  Self.FVideoStrem:=FVideoStrem;
-end;
-
-procedure TVideoThread.Execute;
-var Play:Boolean;
-  GT:UInt64;
-  Decoded,Render:Boolean;
-  tic1, tic2:UInt64;
-  Delay:Int64;
-
-  function isTimePak:Boolean;
-  var tmp:Int64;
-  begin
-   tmp:=Round((FAVPacked.pts * FVideoStrem.time_base.num / FVideoStrem.time_base.den) * 1000);
-   Result:= GT >= tmp
-  end;
-
-begin
-  FAVPacked:=av_packet_alloc;
-  FAVFrame:=av_frame_alloc;
-  New(FGotFrame);
-  Decoded:=False;
-  Render:=False;
+  if Assigned(CS) then CS.Enter;
   try
-    while not Self.Terminated do begin
-      //Sleep(15);
-      if Assigned(FOnIsPlayed) and
-         Assigned(FSyncTime) and
-         Assigned(FOnReadPacked) and
-         Assigned(FOnDecodeFrame) and
-         Assigned(FOnRenderVideoFrame)
-      then
-      begin
-        FOnIsPlayed(Play);
-        if Play then begin
-          FSyncTime(GT);
-          if (not Decoded) then begin
-            tic1:=GetTickCount;
-            Decoded := FOnReadPacked(FAVPacked) = 0;
-            if (FAVPacked.stream_index) <> FVideoStrem.index then begin //nedd test
-              Decoded:=False;
-              av_packet_unref(FAVPacked);
+   //FMediaReader.Start;
+   GlobalTime:=0;
+   Timer.Interval:=5;
+   LastVideoThreadRead:=1;
+   {for I := 0 to High(FVideo) do begin
+    if not Assigned(FVideo[i]) then FVideo[i]:=TVideoThread.Create(FVideoStrem);
+    FVideo[i].OnDecodeFrame:=DecodeVideo;
+    FVideo[i].OnRenderVideoFrame:=FDisplay.RenderVideoFrame;
+    FVideo[i].OnReadVideoPacked:=ReadVideoPacked;
+    FVideo[i].OnIsPlayed:=OnIsPlayed;
+    FVideo[i].OnSyncTime:=OnSyncTime;
+    FVideo[i].tag := i;
+   end;}
+   if NOT Assigned(FMediaReader) then begin
+    FMediaReader:=TMediaReader.Create(Self);
+    FMediaReader.OnDecodeFrame:=DecodeVideo;
+    FMediaReader.OnRenderVideoFrame:=FDisplay.RenderVideoFrame;
+    FMediaReader.OnReadVideoPacked:=ReadVideoPacked;
+    FMediaReader.OnIsPlayed:=OnIsPlayed;
+    FMediaReader.OnSyncTime:=OnSyncTime;
+    FMediaReader.Start;
+   end;
+   StartTime:=Round(av_gettime / 1000);
+   StartT:=Time;
+   FPlay:=True;
+   Timer.Enabled:=FPlay;
+  finally
+   if Assigned(CS) then CS.Leave;
+  end;
+end;
+
+{ TMediaReader }
+
+constructor TMediaReader.Create(MediaDecoder: TMediaDecoder);
+begin
+  inherited Create(true);
+  FMediaDecoder:=MediaDecoder;
+end;
+
+procedure TMediaReader.Execute;
+var Play:Boolean;
+  pack:PAVPacket;
+  V,i:Integer;
+begin
+  v:=0;
+  for I := 0 to High(FVideo) do begin
+   if not Assigned(FVideo[i]) then FVideo[i]:=TVideoThread.Create(FMediaDecoder.FVideoStrem);
+   FVideo[i].SetSDL(FMediaDecoder.Display.GetSDLInfo);
+   FVideo[i].OnDecodeFrame:=FOnDecodeFrame;
+   FVideo[i].OnRenderVideoFrame:=FOnRenderVideoFrame;
+   FVideo[i].OnReadVideoPacked:=FOnReadVideoPacked;
+   FVideo[i].OnIsPlayed:=FOnIsPlayed;
+   FVideo[i].OnSyncTime:=FSyncTime;
+   FVideo[i].tag := i;
+   repeat
+     Sleep(1);
+   until (Terminated) or (FVideo[i].FBuffer <> nil);
+  end;
+  NameThreadForDebugging('TMediaReader');
+  try
+   repeat
+    //Sleep(1);
+    //if Assigned(Application) then Application.ProcessMessages;
+    try
+    if (Assigned(FOnIsPlayed))and(Assigned(FMediaDecoder)) then begin
+      if Assigned(FOnIsPlayed) then FOnIsPlayed(self,Play) else Play:=False;
+      if Play then begin
+        //if FMediaDecoder.FVideoBuffer.GetSize < High(FMediaDecoder.FVideoBuffer.FBuffer)-1 then begin
+          if FMediaDecoder.ReadPacked(Pack) = 0 then begin
+            if pack.stream_index = FMediaDecoder.FVideoIdx then begin
+              repeat
+               Sleep(1);
+               if not Assigned(FVideo[v]) then Break;
+               if (Terminated) or (not Play) then Break;
+              until (FVideo[v].FBuffer.GetCount <= FVideo[v].FBuffer.GetSize-1);
+              if Assigned(FVideo[v]) then
+              //if FVideo[v].FBuffer.GetSize < High(FVideo[v].FBuffer.FBuffer)-1 then begin
+               FVideo[v].FBuffer.WriteData(Pointer(pack));
+               //Break;
+              //end;
+              Inc(V);
+              if v >= High(FVideo) then v:=0;
+              //FMediaDecoder.FVideoBuffer.WriteData(Pointer(pack));
+              pack:=nil;
+            end else begin
+              av_packet_unref(pack);
+              av_packet_free(@pack);
+              pack:=nil;
             end;
           end;
-          if Decoded then begin
-            if isTimePak then begin Decoded:=False;
-              Render:= FOnDecodeFrame(FAVPacked,FAVFrame,FGotFrame) > 0;
-              if Render then begin
-                FOnRenderVideoFrame(
-                    FVideoStrem.codec.width,
-                    FVideoStrem.codec.height,
-                    FAVFrame.data,
-                    FAVFrame.linesize,
-                    FVideoStrem.codec.pix_fmt
-                );
-                Decoded:=False; Render:=False;
-              end;
-              tic2:=GetTickCount;
-              Delay:=round((FAVPacked.duration * (FVideoStrem.time_base.num / FVideoStrem.time_base.den)* 1000))-(tic2-tic1);
-              if Delay < 0 then Delay := 0;              
-              Sleep(Delay);
-            end; //is time end
-          end;
-        end;
       end;
     end;
+    except
+     on E:Exception do begin
+      OutputDebugString(PWideChar('ERROR [TMediaReader]:'+E.Message));
+     end;
+    end;
+   until (Terminated);
   finally
-    av_frame_free(@FAVFrame);
-    av_packet_free(@FAVFrame);
-    Dispose(FGotFrame);
+    for I := 0 to High(FVideo) do begin
+      FreeAndNil(FVideo[i]);
+    end;
   end;
 end;
 
