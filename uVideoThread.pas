@@ -41,6 +41,8 @@ type
     FAVPacked:PAVPacket;
     FAVFrame:PAVFrame;
     FGotFrame:PInteger;
+    FBitMap:TCanvas;
+    FMediaDisplay:TMediaDisplay;
     procedure Execute; override;
     Function Ini3DCanvas(Rect:TSDL_Rect):Boolean;
     Function Free3DCanvas:Boolean;
@@ -52,6 +54,8 @@ type
     Tag:Integer;
     constructor Create(FVideoStrem:PAVStream);
     Procedure SetSDL(SDLPantalla: PSDLPantalla);
+    Procedure SetBitmap(BitMap:TCanvas);
+    Procedure SetMediaDisplay(Display:TMediaDisplay);
     Property OnSyncTime:TOnSyncTime read FSyncTime Write FSyncTime;
     Property OnDecodeFrame:TOnDecodeVideo read FOnDecodeFrame Write FOnDecodeFrame;
     property OnReadVideoPacked:TOnReadVideoPacked read FOnReadVideoPacked Write FOnReadVideoPacked;
@@ -99,19 +103,21 @@ function TVideoThread.CaslcSize(Sourse: TSDL_Rect): TSDL_Rect;
 var rect:TSDL_Rect;
     pw,ph,p:Double;
 begin
-  if not Assigned(FSDLPantalla.Renderer) then Exit;
-  SDL_RenderGetViewport(FSDLPantalla.Renderer,@rect);
+  //if not Assigned(FSDLPantalla.Renderer) then Exit;
+  //SDL_RenderGetViewport(FSDLPantalla.Renderer,@rect);
   //WinRect:=GetClientRect;
   Result.x := 0;
   Result.y := 0;
   Result.w := Sourse.w;
   Result.h := Sourse.h;
   //p := (WinRect.Width * 100) / Result.w;
-  p := (rect.w * 100) / Result.w;
+  p := (FMediaDisplay.Width * 100) / Result.w;
+  //p := (rect.w * 100) / Result.w;
   Result.w := round((Result.w * p) / 100);
   Result.h := round((Result.h * p) / 100);
   if Result.h > rect.h then begin
-    p := (rect.h * 100) / Result.h;
+    p := (FMediaDisplay.Height * 100) / Result.h;
+    //p := (rect.h * 100) / Result.h;
     Result.w := round((Result.w * p) / 100);
     Result.h := round((Result.h * p) / 100);
   end;
@@ -343,7 +349,7 @@ var
   rect: TSDL_Rect;
 begin
  //if Assigned(CS) then CS.Enter;
- if not Assigned(FSDLPantalla.Window) then Exit;
+ //if not Assigned(FSDLPantalla.Window) then Exit;
  try
   pix_F := AV_PIX_FMT_BGR0;
   // Задаём размеры прямоугольника в дальнейшем по мену будем считать преобразование размера кадра
@@ -352,11 +358,11 @@ begin
   rect.w := w; // шырена
   rect.h := h; // высота
   rect2:=CaslcSize(rect);
-  Ini3DCanvas(rect2{rect});
+  //Ini3DCanvas(rect2{rect});
   // проверяем была ли инициализация
-  if {(not assigned(FSDLPantalla.Window.surface)) OR }(not assigned(MooseTexture)) then begin
+  (*if {(not assigned(FSDLPantalla.Window.surface)) OR }(not assigned(MooseTexture)) then begin
     Exit;
-  end;
+  end;*)
   // Очистка от предыдущий ошибок
   Img := av_frame_alloc(); // Создаём пространство для конвертированного кадра
   // получаем контекст для преобразования в RGBы
@@ -375,21 +381,21 @@ begin
     if FAVFrame.pict_type <> AV_PICTURE_TYPE_NONE then begin
      SaveFrameAsJPEG(rect2.w, rect2.H,Img.Data[0], Img.linesize[0]);
     end;
-    res := SDL_UpdateTexture(MooseTexture, @rect2, @Img.Data[0]^, Img.linesize[0]);
+    //res := SDL_UpdateTexture(MooseTexture, @rect2, @Img.Data[0]^, Img.linesize[0]);
     if res = 0 then begin
     //SDL_RenderClear(FSDLPantalla^.Renderer);
     // копируем картинку с текстуры в рендер
     //if (*FProportionally*) true then begin
     //TicB:=GetTickCount;
-      res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture,
+      (*res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture,
         nil,// С какой области скопировать кадр
         nil//@rect // На какой размер растянуть кадр
-        );
+        );*)
     //TicE:=GetTickCount;
     //OutputDebugString(PWideChar('SDL_RenderCopy ms:'+IntToStr(TicE - TicB)));
     end;
-    if res <> 0 then
-      raise Exception.Create('SDL Error Message : '+SDL_GetError());
+    {if res <> 0 then
+      raise Exception.Create('SDL Error Message : '+SDL_GetError());}
     (*end else begin
       res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture,
         @rect,// С какой области скопировать кадр
@@ -412,17 +418,20 @@ begin
   //av_frame_unref(@Img);
   av_frame_free(@Img);
   //Application.ProcessMessages;
-  SDL_RenderPresent(FSDLPantalla^.Renderer);
+  //SDL_RenderPresent(FSDLPantalla^.Renderer);
   //if Assigned(CS) then CS.Leave;
  end;
 end;
 
 function TVideoThread.SaveFrameAsJPEG(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer): Integer;
 var
-  BMPFile:TFileStream;
+  BMPFile:TMemoryStream;//TFileStream;
   BMPHeader:BITMAPFILEHEADER;
   BMPInfo:TBitmapV4Header;
   ret:Integer;
+
+  bmp:TBitmap;
+
 begin Result:=0;
   bmpheader.bfReserved1 := 0;
   bmpheader.bfReserved2 := 0;
@@ -450,14 +459,30 @@ begin Result:=0;
   BMPInfo.bV4GammaGreen:=0;
   BMPInfo.bV4GammaBlue:=0;
 
-  BMPFile:=TFileStream.Create(ExtractFilePath(GetCurrentDir)+'TEST'+IntToStr(Random(500))+'.jpg',fmCreate);
+  //BMPFile:=TFileStream.Create(ExtractFilePath(GetCurrentDir)+'TEST'+IntToStr(Random(500))+'.jpg',fmCreate);
+  BMPFile:=TMemoryStream.Create;
+  bmp:=TBitmap.Create;
   try
     BMPFile.WriteBuffer(bmpheader,SizeOf(bmpheader));
     BMPFile.WriteBuffer(bmpinfo,SizeOf(bmpinfo));
     BMPFile.WriteBuffer(data[0]^,w*h*32 div 8);
+    BMPFile.Position:=0;
+    BMP.LoadFromStream(BMPFile);
+    FBitMap.Draw(0,0,bmp);
   finally
     FreeAndNil(BMPFile);
+    FreeAndNil(bmp);
   end;
+end;
+
+procedure TVideoThread.SetBitmap(BitMap: TCanvas);
+begin
+  FBitMap:=BitMap;
+end;
+
+procedure TVideoThread.SetMediaDisplay(Display: TMediaDisplay);
+begin
+  FMediaDisplay:=Display;
 end;
 
 procedure TVideoThread.SetSDL(SDLPantalla: PSDLPantalla);

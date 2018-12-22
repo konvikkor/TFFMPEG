@@ -33,6 +33,7 @@ type
     FProportionally: Boolean;
     Timer: TTimer;
     CS:TCriticalSection;
+    FAutoInitSDL: Boolean;
     procedure CreateWnd; override;
     procedure DestroyWnd; override;
     procedure OnTimer(Sender:TObject);
@@ -45,11 +46,15 @@ type
     procedure OnRenderVideo(var Data:PMediaBufferInfo);
   public
     Function GetSDLInfo:PSDLPantalla;
+    function GetCanvas:TCanvas;
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     procedure UpdateRender;
     procedure RenderVideoFrame(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer; pix_fmt:TAVPixelFormat);
+    Procedure InitSDL;
+    Procedure DeInitSDL;
   published
+    Property AutoInitSDL:Boolean Read FAutoInitSDL Write FAutoInitSDL default true;
     property Anchors;
     property OnContextPopup;
     property PopupMenu;
@@ -119,6 +124,7 @@ end;
 procedure TMediaDisplay.CreateWnd;
 begin
   inherited;
+  if not FAutoInitSDL then Exit;
   if SDL_WasInit(SDL_INIT_VIDEO) <> SDL_INIT_VIDEO then
     SDL_InitSubSystem(SDL_INIT_VIDEO);
   (*if TTF_Init = 0 then begin
@@ -174,6 +180,11 @@ begin
   //Timer.Enabled := True;
 end;
 
+procedure TMediaDisplay.DeInitSDL;
+begin
+  Free3DCanvas;
+end;
+
 destructor TMediaDisplay.Destroy;
 begin
   FreeAndNil(CS);
@@ -215,6 +226,11 @@ begin Result:=True;
  end;
 end;
 
+function TMediaDisplay.GetCanvas: TCanvas;
+begin
+  Result:=Self.Canvas;
+end;
+
 function TMediaDisplay.GetSDLInfo: PSDLPantalla;
 begin
   Result:=FSDLPantalla;
@@ -253,6 +269,17 @@ begin  Result:=True;
 
  except
    Result:=False;
+ end;
+end;
+
+procedure TMediaDisplay.InitSDL;
+var tmp:Boolean;
+begin
+ if FSDLPantalla.Window = nil then begin
+   tmp:=FAutoInitSDL;
+   FAutoInitSDL:=True;
+   CreateWnd;
+   FAutoInitSDL:=tmp;
  end;
 end;
 

@@ -494,6 +494,8 @@ begin
   for I := 0 to High(FVideo) do begin
    if not Assigned(FVideo[i]) then FVideo[i]:=TVideoThread.Create(FMediaDecoder.FVideoStrem);
    FVideo[i].SetSDL(FMediaDecoder.Display.GetSDLInfo);
+   FVideo[i].SetBitmap(FMediaDecoder.Display.GetCanvas);
+   FVideo[i].SetMediaDisplay(FMediaDecoder.Display);
    FVideo[i].OnDecodeFrame:=FOnDecodeFrame;
    FVideo[i].OnRenderVideoFrame:=FOnRenderVideoFrame;
    FVideo[i].OnReadVideoPacked:=FOnReadVideoPacked;
@@ -524,8 +526,8 @@ begin
               until (FVideo[v].FBuffer.GetCount < FVideo[v].FBuffer.GetSize-1);
               if Assigned(FVideo[v]) then
               //if FVideo[v].FBuffer.GetSize < High(FVideo[v].FBuffer.FBuffer)-1 then begin
-               FVideo[v].FBuffer.WriteData(Pointer(pack));
-               //Break;
+              FVideo[v].FBuffer.WriteData(Pointer(pack));
+              //Break;
               //end;
               Inc(V);
               if v >= High(FVideo) then v:=0;

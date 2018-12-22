@@ -116,8 +116,10 @@ end;
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   MediaDisplay:=TMediaDisplay.Create(TabSheet2);
+  MediaDisplay.AutoInitSDL:=False;
   MediaDisplay.Parent:=TabSheet2;
   MediaDisplay.Align:=alClient;
+  MediaDisplay.DeInitSDL;
 end;
 
 procedure TForm1.OnError(Sender: TObject; ErrorCode: Integer; MSG: string);
