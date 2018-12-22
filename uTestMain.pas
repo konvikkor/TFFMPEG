@@ -146,8 +146,8 @@ end;
 
 procedure TForm1.Timer1Timer(Sender: TObject);
 begin
-  if Assigned(Media) then StatusBar1.Panels[0].Text:='[C]'+Media.GetCurrentTime;
-  if Assigned(Media) then StatusBar1.Panels[1].Text:='[B]'+Media.GetBufferTime;
+  //if Assigned(Media) then StatusBar1.Panels[0].Text:='[C]'+Media.GetCurrentTime;
+  //if Assigned(Media) then StatusBar1.Panels[1].Text:='[B]'+Media.GetBufferTime;
   //if Assigned(Media) then StatusBar1.Panels[1].Text:='[T]'+Media.GetBufferTime;
 end;
 

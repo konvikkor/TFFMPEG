@@ -115,7 +115,7 @@ begin
   //p := (rect.w * 100) / Result.w;
   Result.w := round((Result.w * p) / 100);
   Result.h := round((Result.h * p) / 100);
-  if Result.h > rect.h then begin
+  if Result.h > FMediaDisplay.Height then begin
     p := (FMediaDisplay.Height * 100) / Result.h;
     //p := (rect.h * 100) / Result.h;
     Result.w := round((Result.w * p) / 100);
@@ -198,11 +198,13 @@ begin
             FBuffer.ReadData(Pointer(FAVPacked));
             //FOnReadVideoPacked(Self,Pointer(FAVPacked));
            until (FAVPacked <> nil)or(Terminated)or(not Play);
-           if FAVPacked.stream_index <> Self.FVideoStrem.index then begin
+           if FAVPacked <> nil then begin
+            if FAVPacked.stream_index <> Self.FVideoStrem.index then begin
              try av_packet_free(@FAVPacked);
              finally FAVPacked:=nil;
              end;
              Continue;
+            end;
            end;
            if not Play then Break;
           except
@@ -257,11 +259,11 @@ begin
 
           {if FAVPacked.dts > 0 then
             Delay2:=Round((FAVPacked.dts * (FVideoStrem.time_base.num / FVideoStrem.time_base.den)) * 1000);}
-          av_frame_unref(FAVFrame);
-          av_packet_unref(FAVPacked);
+          Sleep(Delay2);
+          if FAVFrame <> nil then av_frame_unref(FAVFrame);
+          if FAVPacked <> nil then av_packet_unref(FAVPacked);
           av_packet_free(@FAVPacked);
           //Sleep(Delay);
-          Sleep(Delay2);
           //end; //is time end
           //Sleep(3);
         end;
@@ -468,7 +470,12 @@ begin Result:=0;
     BMPFile.WriteBuffer(data[0]^,w*h*32 div 8);
     BMPFile.Position:=0;
     BMP.LoadFromStream(BMPFile);
-    FBitMap.Draw(0,0,bmp);
+    FBitMap.Lock;
+    try
+     FBitMap.Draw(0,0,bmp);
+    finally
+     FBitMap.Unlock;
+    end;
   finally
     FreeAndNil(BMPFile);
     FreeAndNil(bmp);

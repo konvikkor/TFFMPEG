@@ -365,6 +365,9 @@ end;
 destructor TMediaDecoder.Destroy;
 begin
   FreeAndNil(Timer);
+  FMediaReader.Terminate;
+  FreeAndNil(FMediaReader);
+  FMediaReader.WaitFor;
   inherited;
 end;
 
@@ -538,6 +541,8 @@ begin
               av_packet_free(@pack);
               pack:=nil;
             end;
+          end else begin
+            Break;
           end;
       end;
     end;
@@ -549,6 +554,14 @@ begin
    until (Terminated);
   finally
     for I := 0 to High(FVideo) do begin
+      try
+       if FVideo[i] <> nil then begin
+        FVideo[i].Terminate;
+        FVideo[i].WaitFor;
+       end;
+      except
+
+      end;
       FreeAndNil(FVideo[i]);
     end;
   end;

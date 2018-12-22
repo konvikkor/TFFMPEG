@@ -114,17 +114,17 @@ begin
   Self.Width:=200;
   Self.Align:=alNone;
   Self.OnCanResize:=CanResize;
-  Timer:=TTimer.Create(nil);
-  Timer.Interval:=20;
-  Timer.OnTimer:=OnTimer;
-  Timer.Enabled:=True;
+  //Timer:=TTimer.Create(nil);
+  //Timer.Interval:=20;
+  //Timer.OnTimer:=OnTimer;
+  //Timer.Enabled:=True;
   FProportionally:=true;//False;
 end;
 
 procedure TMediaDisplay.CreateWnd;
 begin
   inherited;
-  if not FAutoInitSDL then Exit;
+  (*if not FAutoInitSDL then Exit;
   if SDL_WasInit(SDL_INIT_VIDEO) <> SDL_INIT_VIDEO then
     SDL_InitSubSystem(SDL_INIT_VIDEO);
   (*if TTF_Init = 0 then begin
@@ -133,7 +133,7 @@ begin
    end;
   end else begin
     raise Exception.Create('Error Message [TTF_Init]:'+TTF_GetError());
-  end;*)
+  end;*
   New(FSDLPantalla);
   FSDLPantalla.Window := SDL_CreateWindowFrom(Pointer(Self.Handle));
   if FSDLPantalla.Window <> nil then
@@ -172,7 +172,7 @@ begin
 
   end
   else
-    raise Exception.Create('Error creating SDL2 Window.');
+    raise Exception.Create('Error creating SDL2 Window.');*)
   //Self.OnResize:=Resize;
   //Timer := TTimer.Create(Self);
   //Timer.OnTimer := OnTimer;
@@ -182,7 +182,7 @@ end;
 
 procedure TMediaDisplay.DeInitSDL;
 begin
-  Free3DCanvas;
+  //Free3DCanvas;
 end;
 
 destructor TMediaDisplay.Destroy;
@@ -194,7 +194,7 @@ end;
 procedure TMediaDisplay.DestroyWnd;
 begin
   //FreeAndNil(Timer);
-  Timer.Enabled := False;
+  (*Timer.Enabled := False;
   if FSDLPantalla.Renderer <> nil then
   begin
     SDL_DestroyRenderer(FSDLPantalla.Renderer);
@@ -206,7 +206,7 @@ begin
     FSDLPantalla.Window := nil;
   end;
   //TTF_Quit;
-  Dispose(FSDLPantalla);
+  Dispose(FSDLPantalla); *)
   inherited;
 end;
 
@@ -217,9 +217,11 @@ begin Result:=True;
     SDL_DestroyTexture(MooseTexture);
     MooseTexture:=nil;
   end;
-  if assigned(FSDLPantalla.Window.surface) then begin
+  if Assigned(FSDLPantalla) then begin
+   if assigned(FSDLPantalla.Window.surface) then begin
     SDL_FreeSurface(FSDLPantalla.Window.surface);
     FSDLPantalla.Window.surface:=nil;
+   end;
   end;
  except
   Result:=False;
@@ -275,12 +277,12 @@ end;
 procedure TMediaDisplay.InitSDL;
 var tmp:Boolean;
 begin
- if FSDLPantalla.Window = nil then begin
+ {if FSDLPantalla.Window = nil then begin
    tmp:=FAutoInitSDL;
    FAutoInitSDL:=True;
    CreateWnd;
    FAutoInitSDL:=tmp;
- end;
+ end;}
 end;
 
 procedure TMediaDisplay.OnRenderVideo(var Data: PMediaBufferInfo);

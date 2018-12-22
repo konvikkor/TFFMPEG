@@ -131,7 +131,6 @@ object Form1: TForm1
     Top = 48
   end
   object Timer1: TTimer
-    Interval = 500
     OnTimer = Timer1Timer
     Left = 132
     Top = 40
