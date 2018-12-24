@@ -28,12 +28,15 @@ type
     TaskDialog1: TTaskDialog;
     Play1: TMenuItem;
     EST1: TMenuItem;
+    TrackBar1: TTrackBar;
+    Stop1: TMenuItem;
     procedure Open1Click(Sender: TObject);
     procedure DecodePak1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure EST1Click(Sender: TObject);
     procedure Play1Click(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
+    procedure Stop1Click(Sender: TObject);
   private
     { Private declarations }
     procedure OnError(Sender:TObject; ErrorCode:Integer; MSG:string);
@@ -119,7 +122,7 @@ begin
   MediaDisplay.AutoInitSDL:=False;
   MediaDisplay.Parent:=TabSheet2;
   MediaDisplay.Align:=alClient;
-  MediaDisplay.DeInitSDL;
+  //MediaDisplay.DeInitSDL;
 end;
 
 procedure TForm1.OnError(Sender: TObject; ErrorCode: Integer; MSG: string);
@@ -142,6 +145,11 @@ procedure TForm1.Play1Click(Sender: TObject);
 begin
   if not Assigned(Media) then exit;
   Media.Start;
+end;
+
+procedure TForm1.Stop1Click(Sender: TObject);
+begin
+ if Assigned(Media) then Media.Stop;
 end;
 
 procedure TForm1.Timer1Timer(Sender: TObject);

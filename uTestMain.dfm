@@ -77,8 +77,23 @@ object Form1: TForm1
       end
     end
     object TabSheet2: TTabSheet
-      Caption = 'TabSheet2'
+      Caption = 'VideoCaplion'
       ImageIndex = 1
+      object TrackBar1: TTrackBar
+        Left = 0
+        Top = 160
+        Width = 592
+        Height = 26
+        Align = alBottom
+        DoubleBuffered = True
+        ParentDoubleBuffered = False
+        PageSize = 3
+        Position = 10
+        SelEnd = 5
+        TabOrder = 0
+        TickMarks = tmBoth
+        TickStyle = tsNone
+      end
     end
   end
   object StatusBar1: TStatusBar
@@ -120,6 +135,10 @@ object Form1: TForm1
     object Play1: TMenuItem
       Caption = 'Play'
       OnClick = Play1Click
+    end
+    object Stop1: TMenuItem
+      Caption = 'Stop'
+      OnClick = Stop1Click
     end
     object EST1: TMenuItem
       Caption = 'TEST'

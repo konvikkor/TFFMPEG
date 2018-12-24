@@ -9,6 +9,7 @@ uses
   uMediaDisplay,uMediaConstant,
 
   Vcl.ExtCtrls,Math,System.SyncObjs,System.Generics.Collections,
+  Winapi.GDIPOBJ, Winapi.GDIPAPI,
 
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, FFTypes, FFUtils, System.DateUtils,
   libavcodec, libavcodec_avfft, libavdevice, libavfilter, libavfilter_avcodec,
@@ -49,6 +50,7 @@ type
     Function CaslcSize(Sourse:TSDL_Rect):TSDL_Rect;
     Function SaveFrameAsJPEG(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer):Integer;
     procedure RenderVideoFrame(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer; pix_fmt:TAVPixelFormat);
+    Procedure GPEasyTextout(Graphics: TGPGraphics; Const TheText: String; Rect: TGPRectF; Color: TGPColor; HAlign, VAlign: TStringAlignment; Size: Integer = 10; FontName: String = 'Arial');
   public
     FBuffer:TMediaBuffer;
     Tag:Integer;
@@ -136,6 +138,7 @@ var Play:Boolean;
   tic1, tic2:UInt64;
   Delay,Delay2:Int64;
   Last_Delay:Int64;
+  ErrorCount:Int64;
 
   function isTimePak:Boolean;
   var tmp:Int64;
@@ -176,27 +179,18 @@ begin
   Delay2:=0;
   Decoded:=False;
   Render:=False;
+  ErrorCount:=0;
   try
-   try
     while not Self.Terminated do begin
-      //Sleep(1);
-      if Assigned(FOnIsPlayed) and
-         Assigned(FSyncTime) and
-         //Assigned(FOnReadVideoPacked) and
-         //Assigned(FOnDecodeFrame) and
-         Assigned(FOnRenderVideoFrame)
-      then
+     try
+      if Assigned(FOnIsPlayed) and Assigned(FSyncTime) then
       begin
         if Assigned(FOnIsPlayed) then FOnIsPlayed(Self,Play);
-        if Play then begin
-          //(FAVPacked.stream_index) <> FVideoStrem.index
-          tic1:=GetTickCount;
+        if Play then begin tic1:=GetTickCount;
           try
-           repeat
-            Sleep(1);
+           repeat Sleep(1);
             if Assigned(FOnIsPlayed) then FOnIsPlayed(Self,Play);
             FBuffer.ReadData(Pointer(FAVPacked));
-            //FOnReadVideoPacked(Self,Pointer(FAVPacked));
            until (FAVPacked <> nil)or(Terminated)or(not Play);
            if FAVPacked <> nil then begin
             if FAVPacked.stream_index <> Self.FVideoStrem.index then begin
@@ -213,17 +207,13 @@ begin
            av_packet_free(@FAVPacked);
            Continue;
           end;
-          //Render := FOnDecodeFrame(self,FAVPacked,FAVFrame,FGotFrame) > 0;
           Render := avcodec_decode_video2(FVideoStrem^.codec, FAVFrame, FGotFrame, FAVPacked) > 0;
           While (not Terminated) do begin
-            //Sleep(1);
-            //Application.ProcessMessages;
             if Assigned(FSyncTime) then FSyncTime(Self,GT,FAVPacked,Delay2);
             if isTimePak then Break;
             if Assigned(FOnIsPlayed) then FOnIsPlayed(Self,Play);
             if not Play then Break;
           end;
-          //if isTimePak then begin
           Decoded:=False;
           if Render then begin
             try
@@ -234,57 +224,41 @@ begin
                   FAVFrame.linesize,
                   FVideoStrem.codec.pix_fmt
               );
-              (*FOnRenderVideoFrame(
-                  FVideoStrem.codec.width,
-                  FVideoStrem.codec.height,
-                  FAVFrame.data,
-                  FAVFrame.linesize,
-                  FVideoStrem.codec.pix_fmt
-              );*)
             finally
 
             end;
             Decoded:=False; Render:=False;
           end;
           tic2:=GetTickCount;
-          //FAVFrame.repeat_pict
-          //Delay:=round((FAVPacked.duration * av_q2d(FVideoStrem.time_base)* 1000))-(tic2-tic1);//+Self.Tag;
-          (* Test Calc Delay *)
-          //Delay:=round(((FAVPacked.duration * (FVideoStrem.time_base.num / FVideoStrem.time_base.den))* 1000))-(tic2-tic1);//+Self.Tag;
-          //Delay:=((FAVPacked.pts - Last_Delay))-(tic2-tic1);
-          //Last_Delay:=FAVPacked.pts;
-          //if Delay < 0 then Delay := 0;
           Delay2:=Delay2-(tic2-tic1);
           if Delay2 < 0 then Delay2:=0;
-
-          {if FAVPacked.dts > 0 then
-            Delay2:=Round((FAVPacked.dts * (FVideoStrem.time_base.num / FVideoStrem.time_base.den)) * 1000);}
           Sleep(Delay2);
           if FAVFrame <> nil then av_frame_unref(FAVFrame);
           if FAVPacked <> nil then av_packet_unref(FAVPacked);
           av_packet_free(@FAVPacked);
-          //Sleep(Delay);
-          //end; //is time end
-          //Sleep(3);
         end;
       end;
-    end;
-   except
-     on E:Exception Do begin
+    except
+      on E:Exception Do begin
        if Assigned(FOnError) then FOnError(self,-1,'ERROR [TVideoThread:'+IntToStr(Self.Tag)+'] '+e.Message);
        {$Ifdef DEBUG}
        OutputDebugString(PWideChar('ERROR [TVideoThread:'+IntToStr(Self.Tag)+'] '+e.Message));
        {$endif}
+       if Assigned(FAVFrame) then av_frame_unref(FAVFrame);
+       if Assigned(FAVPacked) then av_packet_unref(FAVPacked);
+       if Assigned(FAVPacked) then av_packet_free(@FAVPacked);
+	     if Errorcount > 10 then Break;
+	     Inc(ErrorCount);
+      end;
      end;
-   end;
+    end;
   finally
-    Free3DCanvas;
     FreeAndNil(Self.FBuffer);
     {$Ifdef DEBUG}
     OutputDebugString(PChar('TVideoThread:'+IntToStr(Self.Tag)+' END'));
     {$endif}
-    av_frame_free(@FAVFrame);
-    av_packet_free(@FAVFrame);
+    if Assigned(FAVFrame) then av_frame_free(@FAVFrame);
+    if Assigned(FAVPacked) then av_packet_free(@FAVPacked);
     Dispose(FGotFrame);
   end;
 end;
@@ -303,6 +277,31 @@ begin Result:=True;
  except
   Result:=False;
  end;
+end;
+
+procedure TVideoThread.GPEasyTextout(Graphics: TGPGraphics;
+  const TheText: String; Rect: TGPRectF; Color: TGPColor; HAlign,
+  VAlign: TStringAlignment; Size: Integer; FontName: String);
+var
+  StringFormat: TGPStringFormat;
+  FontFamily: TGPFontFamily;
+  Font: TGPFont;
+  Pen: TGPPen;
+  Brush: TGPSolidBrush;
+begin
+  StringFormat := TGPStringFormat.Create;
+  FontFamily := TGPFontFamily.Create(FontName);
+  Font := TGPFont.Create(FontFamily, Size, FontStyleRegular, UnitPixel);
+  Pen := TGPPen.Create(Color);
+  Brush := TGPSolidBrush.Create(Color);
+  StringFormat.SetAlignment(HAlign);
+  StringFormat.SetLineAlignment(VAlign);
+  Graphics.DrawString(TheText, -1, Font, Rect, StringFormat, Brush);
+  Pen.Free;
+  Brush.Free;
+  StringFormat.Free;
+  FontFamily.Free;
+  Font.Free;
 end;
 
 function TVideoThread.Ini3DCanvas(Rect: TSDL_Rect): Boolean;
@@ -433,8 +432,14 @@ var
   ret:Integer;
 
   bmp:TBitmap;
+  Graphics : TGPGraphics;
+  Img:TGPBitmap;
+  Text:string;
 
 begin Result:=0;
+
+  Text:=FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,Ceil(FAVPacked.dts * av_q2d(FVideoStrem.time_base)*1000)));
+
   bmpheader.bfReserved1 := 0;
   bmpheader.bfReserved2 := 0;
   bmpheader.bfType := $4d42;
@@ -464,21 +469,30 @@ begin Result:=0;
   //BMPFile:=TFileStream.Create(ExtractFilePath(GetCurrentDir)+'TEST'+IntToStr(Random(500))+'.jpg',fmCreate);
   BMPFile:=TMemoryStream.Create;
   bmp:=TBitmap.Create;
+  FBitMap.Lock;
+  Graphics := TGPGraphics.Create(FBitMap.Handle);
   try
     BMPFile.WriteBuffer(bmpheader,SizeOf(bmpheader));
     BMPFile.WriteBuffer(bmpinfo,SizeOf(bmpinfo));
     BMPFile.WriteBuffer(data[0]^,w*h*32 div 8);
     BMPFile.Position:=0;
     BMP.LoadFromStream(BMPFile);
-    FBitMap.Lock;
+    img:=TGPBitmap.Create(TStreamAdapter.Create(BMPFile));
     try
-     FBitMap.Draw(0,0,bmp);
+     Graphics.DrawImage(Img,0,0,w,h);
+     {$ifdef SHOW_MEDIA}
+     GPEasyTextout(Graphics, Text, MakeRect(1, 1, w*1.0, h*1.0), MakeColor(0, 255, 0), StringAlignmentNear, StringAlignmentNear, 15);
+     GPEasyTextout(Graphics, 'TVideoThread:'+IntToStr(Self.Tag), MakeRect(1, 20, w*1.0, h*1.0), MakeColor(0, 0, 255), StringAlignmentNear, StringAlignmentNear, 10);
+     GPEasyTextout(Graphics, 'Media Component v2.0', MakeRect(1, 1, w*1.0, h*1.0), MakeColor(255, 0, 0), StringAlignmentCenter, StringAlignmentNear, 10);
+     {$endif}
     finally
-     FBitMap.Unlock;
+     FreeAndNil(Img);
     end;
   finally
+    FBitMap.Unlock;
     FreeAndNil(BMPFile);
     FreeAndNil(bmp);
+    FreeAndNil(Graphics);
   end;
 end;
 
