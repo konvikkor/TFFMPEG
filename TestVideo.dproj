@@ -98,6 +98,7 @@
         <DCCReference Include="uMediaDisplay.pas"/>
         <DCCReference Include="uMediaConstant.pas"/>
         <DCCReference Include="uVideoThread.pas"/>
+        <DCCReference Include="uMediaReader.pas"/>
         <None Include="ModelSupport_TestVideo\default.txaPackage"/>
         <None Include="ModelSupport_TestVideo\default.txvpck"/>
         <None Include="ModelSupport_TestVideo\uVideoMain\default.txvpck"/>

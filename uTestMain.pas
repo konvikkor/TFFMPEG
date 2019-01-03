@@ -4,7 +4,7 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, uVideoMain, Vcl.Menus, Vcl.ComCtrls,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, uVideoMain, Vcl.Menus, Vcl.ComCtrls,  OpenGL,
   Vcl.StdCtrls, Vcl.ExtCtrls, System.DateUtils, uMediaDisplay;
 
 type
@@ -30,6 +30,7 @@ type
     EST1: TMenuItem;
     TrackBar1: TTrackBar;
     Stop1: TMenuItem;
+    OpenDialog2: TOpenDialog;
     procedure Open1Click(Sender: TObject);
     procedure DecodePak1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
@@ -48,6 +49,7 @@ type
 var
   Form1: TForm1;
   MediaDisplay:TMediaDisplay;
+  BMP:TBitmap;
 
 implementation
 
@@ -111,18 +113,55 @@ begin
 end;
 
 procedure TForm1.EST1Click(Sender: TObject);
+var
+  Texture:Cardinal;
 begin
-  Media.ReadPacked;
-  Media.DecodeVideo;
+  (*glClear(GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT);
+  glLoadIdentity;
+  glTranslatef(0.0,0.0,-10.0);
+  glBegin(GL_TRIANGLES);
+    glVertex3f( -1, 0, 5); glVertex3f(1, 0, 5); glVertex3f(0, 1, 5);
+  glEnd;
+  glFinish;*)
+  //glTranslatef(0.0,0.0,-10.0);
+  //glMatrixMode(GL_PROJECTION);
+  //gluLookAt(0,0,-10,0,0,0,0,0,1); //Позиция наблюдения
+  //glFrustum(-0.1, 0.1, -0.1, 0.1, 0.3, 25.0);
+  (*glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
+  glBegin(GL_QUADS);
+    glColor3f(1.0, 1.0, 1.0);
+    glVertex2i(0,0);
+    glColor3f(0.0, 0.0, 1.0);
+    glVertex2i(0,ClientWidth);
+    glColor3f(0.0, 1.0, 0.0);
+    glVertex2i(ClientWidth,ClientHeight);
+    glColor3f(1.0, 0.0, 0.0);
+    glVertex2i(ClientWidth,0);
+  glEnd;
+  SwapBuffers(MediaDisplay.HDC);*)
+  //SwapBuffers(wglGetCurrentDC);
+  glClear(GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT);//GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
+  if OpenDialog2.Execute then begin
+   BMP:=TBitmap.Create;
+   try
+    BMP.LoadFromFile(OpenDialog2.FileName);
+    MediaDisplay.SetBitmap(BMP);
+   finally
+     FreeAndNil(BMP);
+   end;
+  end;
+  //SwapBuffers(MediaDisplay.HDC);
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   MediaDisplay:=TMediaDisplay.Create(TabSheet2);
-  MediaDisplay.AutoInitSDL:=False;
+  //MediaDisplay.AutoInitSDL:=False;
   MediaDisplay.Parent:=TabSheet2;
   MediaDisplay.Align:=alClient;
   //MediaDisplay.DeInitSDL;
+  Application.ProcessMessages;
+  //MediaDisplay.InitSDL;
 end;
 
 procedure TForm1.OnError(Sender: TObject; ErrorCode: Integer; MSG: string);
@@ -144,6 +183,8 @@ end;
 procedure TForm1.Play1Click(Sender: TObject);
 begin
   if not Assigned(Media) then exit;
+  //MediaDisplay.InitSDL;
+  Media.SeekVideo(0);
   Media.Start;
 end;
 

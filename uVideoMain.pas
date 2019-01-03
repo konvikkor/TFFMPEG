@@ -61,30 +61,6 @@ type
     Property OnError:TOnError read FOnError Write FOnError;
   end;
 
-  TMediaDecoder = class;
-
-  TMediaReader = class (TThread)
-  private
-    FOnIsPlayed: TOnIsPlayed;
-    FOnError: TOnError;
-    FOnReadVideoPacked: TOnReadVideoPacked;
-    FOnDecodeFrame: TOnDecodeVideo;
-    FSyncTime: TOnSyncTime;
-    FOnRenderVideoFrame: TOnRenderVideoFrame;
-  protected
-    FVideo:Array [0..1] of TVideoThread;
-    FMediaDecoder:TMediaDecoder;
-    procedure Execute; override;
-  published
-    constructor Create(MediaDecoder:TMediaDecoder);
-    Property OnSyncTime:TOnSyncTime read FSyncTime Write FSyncTime;
-    Property OnDecodeFrame:TOnDecodeVideo read FOnDecodeFrame Write FOnDecodeFrame;
-    property OnReadVideoPacked:TOnReadVideoPacked read FOnReadVideoPacked Write FOnReadVideoPacked;
-    property OnRenderVideoFrame:TOnRenderVideoFrame read FOnRenderVideoFrame Write FOnRenderVideoFrame;
-    property OnIsPlayed:TOnIsPlayed read FOnIsPlayed write FOnIsPlayed;
-    property OnError:TOnError Read FOnError Write FOnError;
-  end;
-
   TMediaDecoder = class(TMediaCore)
   private
     FPlay: Boolean;
@@ -95,23 +71,29 @@ type
     Last_pts:Int64;
   protected
     //FVideo:Array [0..0] of TVideoThread;
-    FMediaReader:TMediaReader;
+    (* TMediaReader *)
+    FMediaReader:Pointer;
     Procedure OnTimer(sender:TObject);
     procedure OnIsPlayed(Sender:TObject;var Play:Boolean);
     procedure OnSyncTime(Sender:TObject;var GT:UInt64; Pack:PAVPacket; var Delay:Int64);
   public
     constructor Create;
     destructor Destroy;
+    Function GetVideoStrem:PAVStream;
     function Start:Boolean;
     function Stop:Boolean;
     property Play:Boolean Read FPlay default false;
     function GetCurrentTime:string;
     Function GetBufferTime:string;
+    Property VideoIdx:Integer Read FVideoIdx;
   end;
 
 function DurationToStr(ADuration: Int64): string;
 
 implementation
+
+uses
+  uMediaReader;
 
 function DurationToStr(ADuration: Int64): string;
 var
@@ -373,9 +355,9 @@ destructor TMediaDecoder.Destroy;
 begin
   //FreeAndNil(Timer);
   FPlay:=False;
-  FMediaReader.Terminate;
-  FreeAndNil(FMediaReader);
-  FMediaReader.WaitFor;
+  TMediaReader(FMediaReader).Terminate;
+  TMediaReader(FMediaReader).WaitFor;
+  FreeAndNil(TMediaReader(FMediaReader));
   inherited;
 end;
 
@@ -395,6 +377,11 @@ begin
   Result:=Result+FormatDateTime('hh.mm.ss.zzz',CurrentTime);
 end;
 
+function TMediaDecoder.GetVideoStrem: PAVStream;
+begin
+ Result:=FVideoStrem;
+end;
+
 procedure TMediaDecoder.OnIsPlayed(Sender:TObject;var Play: Boolean);
 begin
  //CS.Enter;
@@ -410,6 +397,7 @@ begin
 end;
 
 procedure TMediaDecoder.OnSyncTime(Sender:TObject;var GT: UInt64; Pack:PAVPacket; var Delay:Int64);
+var tmp:Int64;
 begin
  if Assigned(CS) then CS.Enter;
  try
@@ -423,8 +411,12 @@ begin
                   (pack.duration * av_q2d(FVideoStrem.time_base))*1000
                 );
    //Delay:=int64(FVideoStrem.r_frame_rate.den);
-  end else Delay:=0;
-  if Delay < 0 then Delay:=0;
+   tmp:=gt-Ceil(
+                  (pack.pts * av_q2d(FVideoStrem.time_base))*1000
+                );
+   if tmp > Delay then Delay:=1;
+  end else Delay:=1;
+  if Delay < 0 then Delay:=1;
   (* Test Result ??? *)
   Last_pts:=pack.pts;
  finally
@@ -462,13 +454,13 @@ begin Result:=False;
    LastVideoThreadRead:=1;
    if NOT Assigned(FMediaReader) then begin
     FMediaReader:=TMediaReader.Create(Self);
-    FMediaReader.OnDecodeFrame:=DecodeVideo;
+    TMediaReader(FMediaReader).OnDecodeFrame:=DecodeVideo;
     //FMediaReader.OnRenderVideoFrame:=FDisplay.RenderVideoFrame;
-    FMediaReader.OnReadVideoPacked:=ReadVideoPacked;
-    FMediaReader.OnIsPlayed:=OnIsPlayed;
-    FMediaReader.OnSyncTime:=OnSyncTime;
-    FMediaReader.Start;
+    TMediaReader(FMediaReader).OnReadVideoPacked:=ReadVideoPacked;
+    TMediaReader(FMediaReader).OnIsPlayed:=OnIsPlayed;
+    TMediaReader(FMediaReader).OnSyncTime:=OnSyncTime;
    end;
+   if (TMediaReader(FMediaReader).Suspended) then TMediaReader(FMediaReader).Start;//(FMediaReader.Finished)or(FMediaReader.Started)or
    StartTime:=Round(av_gettime / 1000);
    StartT:=Time;
    FPlay:=True;
@@ -485,97 +477,11 @@ begin Result:=False;
   end;
   FPlay:=False;
   try
-   FMediaReader.Terminate;
-   FreeAndNil(FMediaReader);
+   TMediaReader(FMediaReader).Terminate;
+   //TMediaReader(FMediaReader).WaitFor;
+   FreeAndNil(TMediaReader(FMediaReader));
   except
     FPlay:=False;
-  end;
-end;
-
-{ TMediaReader }
-
-constructor TMediaReader.Create(MediaDecoder: TMediaDecoder);
-begin
-  inherited Create(true);
-  FMediaDecoder:=MediaDecoder;
-end;
-
-procedure TMediaReader.Execute;
-var Play:Boolean;
-  pack:PAVPacket;
-  V,i:Integer;
-begin
-  v:=0;
-  for I := 0 to High(FVideo) do begin
-   if not Assigned(FVideo[i]) then FVideo[i]:=TVideoThread.Create(FMediaDecoder.FVideoStrem);
-   //FVideo[i].SetSDL(FMediaDecoder.Display.GetSDLInfo);
-   FVideo[i].SetBitmap(FMediaDecoder.Display.GetCanvas);
-   FVideo[i].SetMediaDisplay(FMediaDecoder.Display);
-   FVideo[i].OnDecodeFrame:=FOnDecodeFrame;
-   //FVideo[i].OnRenderVideoFrame:=FOnRenderVideoFrame;
-   FVideo[i].OnReadVideoPacked:=FOnReadVideoPacked;
-   FVideo[i].OnIsPlayed:=FOnIsPlayed;
-   FVideo[i].OnSyncTime:=FSyncTime;
-   FVideo[i].tag := i;
-   repeat
-     Sleep(1);
-   until (Terminated) or (FVideo[i].FBuffer <> nil);
-  end;
-  NameThreadForDebugging('TMediaReader');
-  try
-   repeat
-    //Sleep(1);
-    //if Assigned(Application) then Application.ProcessMessages;
-    try
-    if (Assigned(FOnIsPlayed))and(Assigned(FMediaDecoder)) then begin
-      if Assigned(FOnIsPlayed) then FOnIsPlayed(self,Play) else Play:=False;
-      if Play then begin
-        //if FMediaDecoder.FVideoBuffer.GetSize < High(FMediaDecoder.FVideoBuffer.FBuffer)-1 then begin
-          if FMediaDecoder.ReadPacked(Pack) = 0 then begin
-            if pack.stream_index = FMediaDecoder.FVideoIdx then begin
-              repeat
-               Sleep(1);
-               //Application.ProcessMessages;
-               if not Assigned(FVideo[v]) then Break;
-               if (Terminated) or (not Play) then Break;
-              until (FVideo[v].FBuffer.GetCount < FVideo[v].FBuffer.GetSize-1);
-              if Assigned(FVideo[v]) then
-              //if FVideo[v].FBuffer.GetSize < High(FVideo[v].FBuffer.FBuffer)-1 then begin
-              FVideo[v].FBuffer.WriteData(Pointer(pack));
-              //Break;
-              //end;
-              Inc(V);
-              if v >= High(FVideo) then v:=0;
-              //FMediaDecoder.FVideoBuffer.WriteData(Pointer(pack));
-              pack:=nil;
-            end else begin
-              av_packet_unref(pack);
-              av_packet_free(@pack);
-              pack:=nil;
-            end;
-          end else begin
-            Break;
-          end;
-      end;
-    end;
-    except
-     on E:Exception do begin
-      OutputDebugString(PWideChar('ERROR [TMediaReader]:'+E.Message));
-     end;
-    end;
-   until (Terminated);
-  finally
-    for I := 0 to High(FVideo) do begin
-      try
-       if FVideo[i] <> nil then begin
-        FVideo[i].Terminate;
-        FVideo[i].WaitFor;
-       end;
-      except
-
-      end;
-      FreeAndNil(FVideo[i]);
-    end;
   end;
 end;
 

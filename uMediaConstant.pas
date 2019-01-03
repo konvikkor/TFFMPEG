@@ -43,6 +43,7 @@ type
   //TOnReadAudioPacked = Function (Sender:TObject;var Pack:Pointer):Integer of object;
   TOnRenderVideoFrame = procedure (w,h:SInt32;Data:Array of PByte;linesize: Array of Integer; pix_fmt:TAVPixelFormat) of object;
   TOnIsPlayed = Procedure (Sender:TObject;var Play:Boolean)of object;
+  TOnFlushBuffer = procedure (Sender:TObject; var Item:Pointer) of object;
 
   TMediaBufferInfo = packed Record
     AVStream  : PAVStream;
@@ -56,6 +57,7 @@ type
   private
     CS:TCriticalSection;
     FLastReadItem, FLastWriteItem:Cardinal;
+    FOnFlushBuffer: TOnFlushBuffer;
   protected
     FBuffer:TArray<Pointer>;
   public
@@ -67,6 +69,8 @@ type
     Function GetSize:Cardinal;
     Property LastReadItem:Cardinal read FLastReadItem;
     property LastWriteItem:Cardinal read FLastWriteItem;
+    Property OnFlushBuffer:TOnFlushBuffer read FOnFlushBuffer write FOnFlushBuffer;
+    Procedure FlushBuffer;
   end;
 
 implementation
@@ -89,6 +93,17 @@ begin
   FreeAndNil(CS);
 end;
 
+procedure TMediaBuffer.FlushBuffer;
+var i:Integer;
+begin
+  for I := 0 to High(FBuffer) do begin
+   if FBuffer[i] <> nil then begin
+    FOnFlushBuffer(Self,FBuffer[i]);
+    if FBuffer[i] <> nil then FBuffer[i]:=nil;
+   end;
+  end;
+end;
+
 function TMediaBuffer.GetCount: Cardinal;
 begin
   //if Assigned(CS) then CS.Enter;
@@ -107,7 +122,7 @@ function TMediaBuffer.GetSize: Cardinal;
 begin
  //if Assigned(CS) then CS.Enter;
  try
-  Result:=High(FBuffer);
+  Result:=High(FBuffer)-1;
  finally
   //if Assigned(CS) then CS.Leave;
  end;
@@ -115,7 +130,7 @@ end;
 
 function TMediaBuffer.ReadData(var Item: Pointer): Cardinal;
 begin
-  if Assigned(CS) then CS.Enter;
+  //if Assigned(CS) then CS.Enter;
   try
    Result:=FLastReadItem;
    Item:=FBuffer[FLastReadItem];
@@ -124,13 +139,13 @@ begin
    inc(FLastReadItem);
    if FLastReadItem > High(FBuffer) then FLastReadItem:=Low(FBuffer);
   finally
-    if Assigned(CS) then CS.Leave;
+    //if Assigned(CS) then CS.Leave;
   end;
 end;
 
 function TMediaBuffer.WriteData(var Item: Pointer): Cardinal;
 begin
-  if Assigned(CS) then CS.Enter;
+  //if Assigned(CS) then CS.Enter;
   try
    Result:=FLastWriteItem;
    if FBuffer[FLastWriteItem] <> nil then begin
@@ -141,7 +156,7 @@ begin
    inc(FLastWriteItem);
    if FLastWriteItem > High(FBuffer) then FLastWriteItem:=Low(FBuffer);
   finally
-    if Assigned(CS) then CS.Leave;
+    //if Assigned(CS) then CS.Leave;
   end;
 end;
 

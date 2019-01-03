@@ -6,10 +6,10 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
   System.Classes, Vcl.Graphics,
   (* Media modules *)
-  uMediaDisplay,uMediaConstant,
+  uMediaDisplay, uMediaConstant, //uMediaReader,
+  Winapi.GDIPOBJ, Winapi.GDIPAPI, OpenGL,
 
   Vcl.ExtCtrls,Math,System.SyncObjs,System.Generics.Collections,
-  Winapi.GDIPOBJ, Winapi.GDIPAPI,
 
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, FFTypes, FFUtils, System.DateUtils,
   libavcodec, libavcodec_avfft, libavdevice, libavfilter, libavfilter_avcodec,
@@ -37,13 +37,17 @@ type
     FSDLPantalla: PSDLPantalla;
     MooseTexture: PSDL_Texture;
     (* SDL < *)
+    CS:TCriticalSection;
   protected
+    GT:UInt64;
+    FEvent:TEvent;
     FVideoStrem:PAVStream;
     FAVPacked:PAVPacket;
     FAVFrame:PAVFrame;
     FGotFrame:PInteger;
     FBitMap:TCanvas;
     FMediaDisplay:TMediaDisplay;
+    procedure FreeBuff (Sender:TObject; var Item:Pointer);
     procedure Execute; override;
     Function Ini3DCanvas(Rect:TSDL_Rect):Boolean;
     Function Free3DCanvas:Boolean;
@@ -54,7 +58,7 @@ type
   public
     FBuffer:TMediaBuffer;
     Tag:Integer;
-    constructor Create(FVideoStrem:PAVStream);
+    constructor Create(FVideoStrem:PAVStream;Event:TEvent;CS:TCriticalSection = nil);
     Procedure SetSDL(SDLPantalla: PSDLPantalla);
     Procedure SetBitmap(BitMap:TCanvas);
     Procedure SetMediaDisplay(Display:TMediaDisplay);
@@ -125,15 +129,16 @@ begin
   end;
 end;
 
-constructor TVideoThread.Create(FVideoStrem: PAVStream);
+constructor TVideoThread.Create(FVideoStrem: PAVStream; Event:TEvent; CS:TCriticalSection);
 begin
   inherited Create(False);
   Self.FVideoStrem:=FVideoStrem;
+  FEvent:=Event;
+  if CS <> nil then Self.CS:=CS;
 end;
 
 procedure TVideoThread.Execute;
 var Play:Boolean;
-  GT:UInt64;
   Decoded,Render:Boolean;
   tic1, tic2:UInt64;
   Delay,Delay2:Int64;
@@ -154,9 +159,11 @@ var Play:Boolean;
    Result:= GT >= tmp
   end;
 
-  function isTimeFrame:boolean;
-  var tmp:Int64;
-  begin
+  function isTimeFail:boolean;
+  var tmp:Int64;tmp1:Int64;
+    tic1, tic2:Int64;
+  begin Result:=True;
+    tic1:=GetTickCount;
    if GT = 0 then begin
      Result:=True;
      exit;
@@ -164,7 +171,11 @@ var Play:Boolean;
    if FAVPacked.dts <> AV_NOPTS_VALUE then
     tmp:=Round((FAVPacked.dts * (FVideoStrem.time_base.num / FVideoStrem.time_base.den)) * 1000)
    else tmp:=0;
-   Result:= (GT div 1000) >= tmp
+   if FAVPacked.duration <> AV_NOPTS_VALUE then
+    tmp1:=Round((FAVPacked.duration * (FVideoStrem.time_base.num / FVideoStrem.time_base.den)) * 1000)
+   else tmp1:=0;
+   tic2:=GetTickCount;
+   Result:= GT - tmp > tmp1 {500};//((GT div 1000)+tmp1-(tic2 - tic1)) >= tmp
   end;
 
 begin
@@ -172,7 +183,10 @@ begin
   {$Ifdef DEBUG}
   OutputDebugString(PChar('TVideoThread:'+IntToStr(Self.Tag)+' START'));
   {$endif}
-  Self.FBuffer:=TMediaBuffer.Create(1000);
+  if Self.FBuffer = nil then begin
+   Self.FBuffer:=TMediaBuffer.Create(1000);
+  end;
+  Self.FBuffer.OnFlushBuffer:=FreeBuff;
   //FAVPacked:=av_packet_alloc;
   FAVFrame:=av_frame_alloc;
   New(FGotFrame);
@@ -182,15 +196,22 @@ begin
   ErrorCount:=0;
   try
     while not Self.Terminated do begin
+     FEvent.WaitFor(INFINITE);
+     FEvent.ResetEvent;
      try
       if Assigned(FOnIsPlayed) and Assigned(FSyncTime) then
       begin
-        if Assigned(FOnIsPlayed) then FOnIsPlayed(Self,Play);
-        if Play then begin tic1:=GetTickCount;
+       if Assigned(FOnIsPlayed) then FOnIsPlayed(Self,Play);
+		   if Play then begin tic1:=GetTickCount;
           try
            repeat Sleep(1);
             if Assigned(FOnIsPlayed) then FOnIsPlayed(Self,Play);
-            FBuffer.ReadData(Pointer(FAVPacked));
+            CS.Enter;
+            try
+             FBuffer.ReadData(Pointer(FAVPacked));
+            finally
+              CS.Leave;
+            end;
            until (FAVPacked <> nil)or(Terminated)or(not Play);
            if FAVPacked <> nil then begin
             if FAVPacked.stream_index <> Self.FVideoStrem.index then begin
@@ -207,16 +228,35 @@ begin
            av_packet_free(@FAVPacked);
            Continue;
           end;
-          Render := avcodec_decode_video2(FVideoStrem^.codec, FAVFrame, FGotFrame, FAVPacked) > 0;
+          //Render := avcodec_decode_video2(FVideoStrem^.codec, FAVFrame, FGotFrame, FAVPacked) > 0;
+          if not isTimeFail then Render := FOnDecodeFrame(self,FAVPacked,FAVFrame,FGotFrame) > 0
+          else Render:=False;
+          //Render := FOnDecodeFrame(self,FAVPacked,FAVFrame,FGotFrame) > 0;
+			(*IF Assigned(CS) then CS.Enter;
+			try
+				//Render := FOnDecodeFrame(self,FAVPacked,FAVFrame,FGotFrame) > 0;
+				Render := avcodec_decode_video2(FVideoStrem^.codec, FAVFrame, FGotFrame, FAVPacked) > 0;
+			finally
+				If Assigned(CS) then CS.Leave;
+			end;*)
           While (not Terminated) do begin
-            if Assigned(FSyncTime) then FSyncTime(Self,GT,FAVPacked,Delay2);
-            if isTimePak then Break;
             if Assigned(FOnIsPlayed) then FOnIsPlayed(Self,Play);
             if not Play then Break;
+            if Assigned(FSyncTime) then FSyncTime(Self,GT,FAVPacked,Delay2);
+            if isTimePak then Break;
+            //if isTimeFail then Break;
+            sleep(1);
           end;
+          FEvent.SetEvent;
+          tic2:=GetTickCount;
+          Delay2:=Delay2-(tic2-tic1);
+          if Delay2 < 0 then Delay2:=1;
+          //Sleep(Delay2);
+          //Sleep(1);
           Decoded:=False;
           if Render then begin
             try
+              //if not isTimeFail then
               RenderVideoFrame(
                   FVideoStrem.codec.width,
                   FVideoStrem.codec.height,
@@ -229,16 +269,12 @@ begin
             end;
             Decoded:=False; Render:=False;
           end;
-          tic2:=GetTickCount;
-          Delay2:=Delay2-(tic2-tic1);
-          if Delay2 < 0 then Delay2:=0;
-          Sleep(Delay2);
           if FAVFrame <> nil then av_frame_unref(FAVFrame);
           if FAVPacked <> nil then av_packet_unref(FAVPacked);
           av_packet_free(@FAVPacked);
         end;
       end;
-    except
+     except
       on E:Exception Do begin
        if Assigned(FOnError) then FOnError(self,-1,'ERROR [TVideoThread:'+IntToStr(Self.Tag)+'] '+e.Message);
        {$Ifdef DEBUG}
@@ -253,7 +289,16 @@ begin
      end;
     end;
   finally
-    FreeAndNil(Self.FBuffer);
+    FEvent.SetEvent;
+    if Self.FBuffer <> nil then begin
+     while Self.FBuffer.GetCount > 0 do begin
+       FBuffer.ReadData(Pointer(FAVPacked));
+       if Assigned(FAVPacked) then av_packet_unref(FAVPacked);
+       if Assigned(FAVPacked) then av_packet_free(@FAVPacked);
+     end;
+     Self.FBuffer.FlushBuffer;
+     FreeAndNil(Self.FBuffer);
+    end;
     {$Ifdef DEBUG}
     OutputDebugString(PChar('TVideoThread:'+IntToStr(Self.Tag)+' END'));
     {$endif}
@@ -277,6 +322,13 @@ begin Result:=True;
  except
   Result:=False;
  end;
+end;
+
+procedure TVideoThread.FreeBuff(Sender: TObject; var Item: Pointer);
+//var AVPacked:PAVPacket;
+begin
+  if Assigned(PAVPacket(Item)) then av_packet_unref(PAVPacket(Item));
+  if Assigned(PAVPacket(Item)) then av_packet_free(@PAVPacket(Item));
 end;
 
 procedure TVideoThread.GPEasyTextout(Graphics: TGPGraphics;
@@ -305,12 +357,12 @@ begin
 end;
 
 function TVideoThread.Ini3DCanvas(Rect: TSDL_Rect): Boolean;
-var
- rect2:TSDL_Rect;
+{var
+ rect2:TSDL_Rect;}
 begin  Result:=True;
  try
-  rect2:=rect;
-  Free3DCanvas;
+  //rect2:=rect;
+  //Free3DCanvas;
   // Создаём текстуру для отображения кадра
   (*if not assigned(FSDLPantalla.Window.surface) then begin
     FSDLPantalla.Window.surface := SDL_CreateRGBSurface(0, rect2.w{AVStream.codec.width},
@@ -322,7 +374,7 @@ begin  Result:=True;
     MooseTexture := SDL_CreateTexture(FSDLPantalla.Renderer,
       SDL_PIXELFORMAT_ARGB8888,
       1,//SDL_TEXTUREACCESS_STREAMING,
-      rect2.w,rect2.h);
+      rect.w,rect.h);
     if MooseTexture = nil then
      raise Exception.Create('CreateTextureFromSurface failed:'+SDL_GetError());
   end;
@@ -352,7 +404,7 @@ begin
  //if Assigned(CS) then CS.Enter;
  //if not Assigned(FSDLPantalla.Window) then Exit;
  try
-  pix_F := AV_PIX_FMT_BGR0;
+  pix_F := AV_PIX_FMT_BGR0;{WORK}
   // Задаём размеры прямоугольника в дальнейшем по мену будем считать преобразование размера кадра
   rect.x := 0; rect.y := 0;
   //MyRect:=GetClientRect;
@@ -380,10 +432,23 @@ begin
     // рисуем картинку на текстуре
     //Ini3DCanvas(rect2);
     if FAVFrame.pict_type <> AV_PICTURE_TYPE_NONE then begin
+     //Self.FMediaDisplay.Render(rect2.w, rect2.H,Img.Data[0], Img.linesize[0]);
      SaveFrameAsJPEG(rect2.w, rect2.H,Img.Data[0], Img.linesize[0]);
+     (*Ini3DCanvas(rect2);
+     try
+     res := SDL_UpdateTexture(MooseTexture, @rect2, @Img.Data[0]^, Img.linesize[0]);
+     if res = 0 then begin
+       res := SDL_RenderCopy(FSDLPantalla^.Renderer, MooseTexture,
+         @rect,// С какой области скопировать кадр
+         nil   // На какой размер растянуть кадр
+       );
+     end;
+     finally
+       Free3DCanvas;
+     end;*)
     end;
     //res := SDL_UpdateTexture(MooseTexture, @rect2, @Img.Data[0]^, Img.linesize[0]);
-    if res = 0 then begin
+    //if res = 0 then begin
     //SDL_RenderClear(FSDLPantalla^.Renderer);
     // копируем картинку с текстуры в рендер
     //if (*FProportionally*) true then begin
@@ -394,7 +459,7 @@ begin
         );*)
     //TicE:=GetTickCount;
     //OutputDebugString(PWideChar('SDL_RenderCopy ms:'+IntToStr(TicE - TicB)));
-    end;
+    //end;
     {if res <> 0 then
       raise Exception.Create('SDL Error Message : '+SDL_GetError());}
     (*end else begin
@@ -436,10 +501,11 @@ var
   Img:TGPBitmap;
   Text:string;
 
+  TextureID:LongInt;
+  Buffer:BITMAP;
+
 begin Result:=0;
-
-  Text:=FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,Ceil(FAVPacked.dts * av_q2d(FVideoStrem.time_base)*1000)));
-
+  if not Assigned(FBitMap) then Exit;
   bmpheader.bfReserved1 := 0;
   bmpheader.bfReserved2 := 0;
   bmpheader.bfType := $4d42;
@@ -448,18 +514,18 @@ begin Result:=0;
 
   bmpinfo.bV4Size := sizeof(BITMAPV4HEADER);
   bmpinfo.bV4Width := w;
-  bmpinfo.bV4Height := -h;
+  bmpinfo.bV4Height := h;
   bmpinfo.bV4Planes := 1;
   bmpinfo.bV4BitCount := 32;//24;
   bmpinfo.bV4V4Compression := BI_BITFIELDS;
   bmpinfo.bV4SizeImage := 0;
-  bmpinfo.bV4XPelsPerMeter := 100;//2835; // ResolutionHorizontal
-  bmpinfo.bV4YPelsPerMeter := 100;//2835; //ResolutionVertical
+  bmpinfo.bV4XPelsPerMeter := 2835; // ResolutionHorizontal
+  bmpinfo.bV4YPelsPerMeter := 2835; //ResolutionVertical
   bmpinfo.bV4ClrUsed := 0;
   bmpinfo.bV4ClrImportant := 0;
-  BMPInfo.bV4RedMask:=$00FF0000;
+  BMPInfo.bV4RedMask:=  $00FF0000;{WORK}
   BMPInfo.bV4GreenMask:=$0000FF00;
-  BMPInfo.bV4BlueMask:=$000000FF;
+  BMPInfo.bV4BlueMask:= $000000FF;{WORK}
   BMPInfo.bV4AlphaMask:=$FF000000;
   BMPInfo.bV4CSType:=$206E6957;
   BMPInfo.bV4GammaRed:=0;
@@ -469,27 +535,42 @@ begin Result:=0;
   //BMPFile:=TFileStream.Create(ExtractFilePath(GetCurrentDir)+'TEST'+IntToStr(Random(500))+'.jpg',fmCreate);
   BMPFile:=TMemoryStream.Create;
   bmp:=TBitmap.Create;
-  FBitMap.Lock;
-  Graphics := TGPGraphics.Create(FBitMap.Handle);
+
+  //FBitMap.Lock;
+  //Graphics := TGPGraphics.Create(FBitMap.Handle);
+  //FMediaDisplay.BeginRender;
   try
     BMPFile.WriteBuffer(bmpheader,SizeOf(bmpheader));
     BMPFile.WriteBuffer(bmpinfo,SizeOf(bmpinfo));
     BMPFile.WriteBuffer(data[0]^,w*h*32 div 8);
     BMPFile.Position:=0;
     BMP.LoadFromStream(BMPFile);
-    img:=TGPBitmap.Create(TStreamAdapter.Create(BMPFile));
+    (* OpenGL > *)
+    //glTranslatef(0.0,0.0,-10.0);
+    //glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
+    //wglMakeCurrent(FMediaDisplay.HDC, FMediaDisplay.RC);
+    //glClear(GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT);//GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
+    FMediaDisplay.SetBitmap(bmp);
+    //SwapBuffers(Self.FMediaDisplay.HDC);
+    (* OpenGL < *)
+    (*img:=TGPBitmap.Create(TStreamAdapter.Create(BMPFile));
     try
+      //FMediaDisplay.RenderBitMap(bmp);
      Graphics.DrawImage(Img,0,0,w,h);
      {$ifdef SHOW_MEDIA}
+     Text:=FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,Ceil(FAVPacked.dts * av_q2d(FVideoStrem.time_base)*1000)))+' [FRAME ]';
      GPEasyTextout(Graphics, Text, MakeRect(1, 1, w*1.0, h*1.0), MakeColor(0, 255, 0), StringAlignmentNear, StringAlignmentNear, 15);
-     GPEasyTextout(Graphics, 'TVideoThread:'+IntToStr(Self.Tag), MakeRect(1, 20, w*1.0, h*1.0), MakeColor(0, 0, 255), StringAlignmentNear, StringAlignmentNear, 10);
+     Text:=FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,GT))+' [GLOBAL]';
+     GPEasyTextout(Graphics, Text, MakeRect(1, 15, w*1.0, h*1.0), MakeColor(0, 255, 255), StringAlignmentNear, StringAlignmentNear, 15);
+     //GPEasyTextout(Graphics, 'TVideoThread:'+IntToStr(Self.Tag), MakeRect(1, 20, w*1.0, h*1.0), MakeColor(0, 0, 255), StringAlignmentNear, StringAlignmentNear, 10);
      GPEasyTextout(Graphics, 'Media Component v2.0', MakeRect(1, 1, w*1.0, h*1.0), MakeColor(255, 0, 0), StringAlignmentCenter, StringAlignmentNear, 10);
      {$endif}
     finally
      FreeAndNil(Img);
-    end;
+    end;*)
   finally
-    FBitMap.Unlock;
+    //FBitMap.Unlock;
+    //FMediaDisplay.EndRender;
     FreeAndNil(BMPFile);
     FreeAndNil(bmp);
     FreeAndNil(Graphics);

@@ -7,6 +7,8 @@ uses
   System.Classes, Vcl.Graphics,
 
   uMediaConstant,
+  Winapi.GDIPOBJ, Winapi.GDIPAPI, OpenGL,
+  //Winapi.D3D11Shader, Winapi.D3D11,
 
   Vcl.ExtCtrls,Math,System.SyncObjs,System.Generics.Collections,
 
@@ -23,6 +25,9 @@ uses
   libavutil_rational, libavutil_samplefmt, libavutil_time, libavutil_timestamp,
   libswresample, libswscale, sdl2, {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading;
 
+//const
+  //GL_BGR = $80E0;
+
 type
   TMediaDisplay = class (TCustomPanel)
   private
@@ -34,21 +39,36 @@ type
     Timer: TTimer;
     CS:TCriticalSection;
     FAutoInitSDL: Boolean;
-    //procedure CreateWnd; override;
-    //procedure DestroyWnd; override;
+    RenderBMP:TBitmap;
   protected
     procedure Paint; override;
+    procedure CreateWnd; override;
+    procedure DestroyWnd; override;
     //Function CaslcSize(Sourse:TSDL_Rect):TSDL_Rect;
     //procedure OnRenderVideo(var Data:PMediaBufferInfo);
+    Procedure InitSDL;
+    Procedure DeInitSDL;
+    procedure setupPixelFormat(DC:HDC);
+    Procedure OnTimer(Sender:TObject);
   public
-    //Function GetSDLInfo:PSDLPantalla;
+    HDC:HDC;
+    RC:HGLRC;
+    Function GetSDLInfo:PSDLPantalla;
     function GetCanvas:TCanvas;
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
     //procedure UpdateRender;
     //procedure RenderVideoFrame(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer; pix_fmt:TAVPixelFormat);
-    //Procedure InitSDL;
-    //Procedure DeInitSDL;
+    procedure EraseBackground(var Message: TWMEraseBkgnd);message WM_ERASEBKGND;
+    procedure Render(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer);
+    Function DrawBitmap(bmp: TBitmap; x, y: Integer; xZoom: Single = 1.0; yZoom: Single = 1.0):TMediaDisplay;
+    function BuildTexture(bmp: TBitmap; var texId: GLuint):TMediaDisplay;
+    function DeleteTexture(texId: GLuint): TMediaDisplay;
+    function DrawBitmapTex(texId: GLuint; x, y, w, h: Integer): TMediaDisplay; overload;
+    function DrawBitmapTex(bmp: TBitmap; x, y, w, h: Integer): TMediaDisplay; overload;
+    Procedure BeginRender;
+    Procedure SetBitmap(BMP:TBitmap);
+    Procedure EndRender;
   published
     Property AutoInitSDL:Boolean Read FAutoInitSDL Write FAutoInitSDL default true;
     property Anchors;
@@ -87,6 +107,28 @@ begin
   end;
 end;*)
 
+procedure TMediaDisplay.BeginRender;
+begin
+ CS.Enter;
+ glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //Очистка буфера цвета и глубины
+end;
+
+function TMediaDisplay.BuildTexture(bmp: TBitmap;
+  var texId: GLuint): TMediaDisplay;
+var
+   bmpInfo: BITMAP;
+begin
+   GetObject(bmp.Handle, SizeOf(bmpInfo), @bmpInfo);
+   glGenTextures(1, @texId);          // Create The Texture
+   glPixelStorei(GL_PACK_ALIGNMENT, 1);
+   // Typical Texture Generation Using Data From The Bitmap
+   glBindTexture(GL_TEXTURE_2D, texId);        // Bind To The Texture ID
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Linear Min Filter
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Linear Mag Filter
+   glTexImage2D(GL_TEXTURE_2D, 0, 3, bmpInfo.bmWidth, bmpInfo.bmHeight, 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
+   Result := Self;
+end;
+
 constructor TMediaDisplay.Create(AOwner: TComponent);
 begin
   inherited;
@@ -95,13 +137,162 @@ begin
   Self.Width:=200;
   Self.Align:=alNone;
   //Self.OnCanResize:=CanResize;
+  FSDLPantalla := nil;
+  //if FSDLPantalla = nil then New(FSDLPantalla);
   FProportionally:=true;//False;
+  //SDL_Init(SDL_INIT_VIDEO);
+  //InitSDL;
+  RenderBMP:=TBitmap.Create;
+end;
+
+procedure TMediaDisplay.CreateWnd;
+begin
+  inherited CreateWnd;
+  hdc:=GetDC(Self.Handle);
+  SetupPixelFormat(hdc);
+  RC:=wglCreateContext(hdc); //makes OpenGL window out of DC
+  wglMakeCurrent(hdc, RC);   //makes OpenGL window active
+  //glMatrixMode(GL_PROJECTION);
+  //glFrustum(-0.1, 0.1, -0.1, 0.1, 0.3, 25.0);
+  //glFrustum ( -50 , 50 , -50 , 50 , 0.3{1.25} , 100.0 ); //Область видимости
+  //glMatrixMode(GL_MODELVIEW);
+  //glLoadIdentity;
+  //gluLookAt(0,0,5,0,0,0,0,0,1); //Позиция наблюдения
+  glEnable(GL_DEPTH_TEST);
+  //glEnable(GL_ALPHA_TEST);
+  glShadeModel(GL_SMOOTH);
+  glEnable(GL_TEXTURE_2D);
+  Timer:=TTimer.Create(self);
+  Timer.OnTimer:=OnTimer;
+  Timer.Interval:=20;
+  (*glClearColor (0.5, 0.5, 0.75, 1.0); //Цвет фона
+  glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //Очистка буфера цвета и глубины
+  glLoadIdentity;
+  glViewport(0,0,ClientWidth,ClientHeight);
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity;
+  gluOrtho2D(0,ClientWidth,0,ClientHeight);
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity;*)
+end;
+
+procedure TMediaDisplay.DeInitSDL;
+begin
+  if FSDLPantalla = nil then exit;
+  if FSDLPantalla.Renderer <> nil then
+  begin
+    SDL_DestroyRenderer(FSDLPantalla.Renderer);
+    FSDLPantalla.Renderer := nil;
+  end;
+  if FSDLPantalla.Window <> nil then
+  begin
+    SDL_DestroyWindow(FSDLPantalla.Window);
+    FSDLPantalla.Window := nil;
+  end;
+  Dispose(FSDLPantalla);
+  FSDLPantalla:=nil;
+  SDL_Quit;
+end;
+
+function TMediaDisplay.DeleteTexture(texId: GLuint): TMediaDisplay;
+begin
+   glDeleteTextures(1, @texId);
+   Result := Self;
 end;
 
 destructor TMediaDisplay.Destroy;
 begin
+  FreeAndNil(RenderBMP);
   FreeAndNil(CS);
+  DeInitSDL;
   inherited;
+end;
+
+procedure TMediaDisplay.DestroyWnd;
+begin
+  FreeAndNil(Timer);
+  DeInitSDL;
+  (* Deinit OpenGL > *)
+  wglMakeCurrent(HDC, 0);
+  wglDeleteContext(RC);
+  ReleaseDC(Self.Handle, HDC);
+  (* Deinit OpenGL < *)
+  inherited;
+end;
+
+function TMediaDisplay.DrawBitmap(bmp: TBitmap; x, y: Integer; xZoom,
+  yZoom: Single): TMediaDisplay;
+var
+   bmpInfo: BITMAP;
+begin
+   GetObject(bmp.Handle, SizeOf(bmpInfo), @bmpInfo);
+   glPixelZoom(xZoom, yZoom);
+   glPushMatrix;
+   glLoadIdentity;
+   glRasterPos2i(x, y);
+   if bmpInfo.bmBitsPixel = 32 then
+     glDrawPixels(bmp.Width, bmp.Height, GL_BGRA_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits)
+   else
+     glDrawPixels(bmp.Width, bmp.Height, GL_BGR_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
+   glPopMatrix;
+   Result := Self;
+end;
+
+function TMediaDisplay.DrawBitmapTex(bmp: TBitmap; x, y, w,
+  h: Integer): TMediaDisplay;
+var
+   tex: GLuint;
+begin
+   glColor3f(1.0, 1.0, 1.0);
+   glDisable(GL_BLEND);
+   glEnable(GL_TEXTURE_2D);
+   BuildTexture(bmp, tex);
+
+   glBegin(GL_QUADS);
+   glTexCoord2f(0.0, 0.0); glVertex3i(x, y, 0);
+   glTexCoord2f(1.0, 0.0); glVertex3f(x + w, y, 0);
+   glTexCoord2f(1.0, 1.0); glVertex3f(x + w, y + h, 0);
+   glTexCoord2f(0.0, 1.0); glVertex3f(x, y + h, 0);
+   glEnd;
+
+   glDeleteTextures(1, @tex);
+   glDisable(GL_TEXTURE_2D);
+   glEnable(GL_BLEND);
+   //SetBlendState(FBlend);
+   //glColor4fv(@FPenColor); // Restore color
+   Result := Self;
+end;
+
+function TMediaDisplay.DrawBitmapTex(texId: GLuint; x, y, w,
+  h: Integer): TMediaDisplay;
+begin
+   glColor3f(1.0, 1.0, 1.0);
+   glDisable(GL_BLEND);
+   glEnable(GL_TEXTURE_2D);
+
+   glBindTexture(GL_TEXTURE_2D, texid);        // Bind To The Texture ID
+   glBegin(GL_QUADS);
+   glTexCoord2f(0.0, 0.0); glVertex3i(x, y, 0);
+   glTexCoord2f(1.0, 0.0); glVertex3f(x + w, y, 0);
+   glTexCoord2f(1.0, 1.0); glVertex3f(x + w, y + h, 0);
+   glTexCoord2f(0.0, 1.0); glVertex3f(x, y + h, 0);
+   glEnd;
+
+   glDisable(GL_TEXTURE_2D);
+   //glEnable(GL_BLEND);
+   //glColor4fv(@FPenColor); // Restore color
+   Result := Self;
+end;
+
+procedure TMediaDisplay.EndRender;
+begin
+ SwapBuffers(wglGetCurrentDC);
+ CS.Leave;
+end;
+
+procedure TMediaDisplay.EraseBackground(var Message: TWMEraseBkgnd);
+begin
+  Message.Result := 1;
 end;
 
 function TMediaDisplay.GetCanvas: TCanvas;
@@ -109,12 +300,112 @@ begin
   Result:=Self.Canvas;
 end;
 
+function TMediaDisplay.GetSDLInfo: PSDLPantalla;
+begin
+ Result:=FSDLPantalla;
+end;
+
+procedure TMediaDisplay.InitSDL;
+begin
+  //if not Self.Showing then exit;
+  if SDL_WasInit(SDL_INIT_VIDEO) <> SDL_INIT_VIDEO then
+    SDL_InitSubSystem(SDL_INIT_VIDEO);
+  FSDLPantalla.Window := SDL_CreateWindowFrom(Pointer(Self.Handle));
+  if FSDLPantalla.Window <> nil then
+  begin
+    FSDLPantalla.Renderer := SDL_CreateRenderer(FSDLPantalla.Window, -1, 0{SDL_RENDERER_PRESENTVSYNC});
+    // no forzamos ningъn tipo de render (0) para que el sistema coja el que pueda Hard-Soft
+    if FSDLPantalla.Renderer <> nil then
+    begin
+      New(FRenderInfo);
+      if SDL_GetRendererInfo(FSDLPantalla.Renderer, FRenderInfo) = 0 then
+      begin
+        FSDLPantalla.max_texture_width := FRenderInfo.max_texture_width;
+        FSDLPantalla.max_texture_height := FRenderInfo.max_texture_height;
+        FSDLPantalla.hardware :=
+          ((FRenderInfo.Flags and SDL_RENDERER_ACCELERATED) > 0);
+        FSDLPantalla.render_name := FRenderInfo.name;
+        // PAnsiChar(FRenderInfo.name);
+        SDL_ShowWindow(FSDLPantalla.Window);
+        if SDL_SetRenderDrawColor(FSDLPantalla.Renderer, 0, 0, 0,
+          SDL_ALPHA_OPAQUE) = 0 then
+        begin
+          if SDL_RenderFillRect(FSDLPantalla.Renderer, nil) = 0 then
+            FFlags := SDL_GetWindowFlags(FSDLPantalla.Window)
+          else
+            ShowMessage('Error clearing render context');
+        end
+        else
+          ShowMessage('Error setting render draw color');
+      end
+      else
+        ShowMessage('Error getting information about rendering context');
+
+    end
+    else
+      ShowMessage('Error crearting SDL2 Render');
+
+  end
+  else
+    ShowMessage('Error creating SDL2 Window.');
+end;
+
+procedure TMediaDisplay.OnTimer(Sender: TObject);
+var  x,y:Integer;
+begin
+  //glClear(GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT);
+  if not Assigned(RenderBMP) then exit;
+  if RenderBMP.Empty then exit;
+  BeginRender;
+  //glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
+  //glLoadIdentity;
+  glMatrixMode(GL_MODELVIEW);
+  x:=-RenderBMP.Width div 2;
+  y:=-RenderBMP.Height div 2;
+  DrawBitmap(RenderBMP,x,y);
+  //SwapBuffers(HDC);
+  EndRender;
+  //glFlush;
+  //Application.ProcessMessages;
+end;
+
 procedure TMediaDisplay.Paint;
 var Rect: TRect;
   Text:string;
 begin
-  //inherited; //?
-  (* Message Pain frame *)
+  glClearColor (0.5, 0.5, 0.75, 1.0); //Цвет фона
+  glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //Очистка буфера цвета и глубины
+  glLoadIdentity;
+  glViewport(0,0,ClientWidth,ClientHeight); // размеры экрана что будем показывать
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity;
+  (*glOrtho(-ClientWidth div 2,
+            ClientWidth div 2,
+            -ClientHeight div 2,
+            ClientHeight div 2,-800,800);   //центровка в ноль по центру экрана*)
+  gluOrtho2D(-ClientWidth div 2,
+            ClientWidth div 2,
+            -ClientHeight div 2,
+            ClientHeight div 2);   //центровка в ноль по центру экрана*)
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity;
+  //glTranslatef(0.0,0.0,-10.0);
+  (* Test OpenGL > *)
+  (*glBegin(GL_QUADS);
+    glColor3f(1.0, 1.0, 1.0);
+    glVertex2i(0,0);
+    glColor3f(0.0, 0.0, 1.0);
+    glVertex2i(0,ClientWidth);
+    glColor3f(0.0, 1.0, 0.0);
+    glVertex2i(ClientWidth,ClientHeight);
+    glColor3f(1.0, 0.0, 0.0);
+    glVertex2i(ClientWidth,0);
+  glEnd;*)
+  (* Test OpenGL < *)
+  SwapBuffers(wglGetCurrentDC); //---------------------------
+ (*Canvas.Lock;
+ try
+  (* Message Pain frame *
   Text:=' Video Canvas ';
   Rect := GetClientRect;
   with Canvas do begin
@@ -126,7 +417,7 @@ begin
     Font.Style := [];
     Font.Height := 24;
     TextOut((Self.Width div 2)-(TextWidth(Text) div 2),(Self.Height div 2)-(TextHeight(Text) div 2),Text);
-    Text:=' Display ['+IntToStr(Self.Tag)+'] '+Self.Caption+' ';
+    Text:=' Display ['+IntToStr(Self.Tag)+'] '+Self.Caption+' ';//+FormatDateTime('hh.mm.ss.zzz',Time);
     Brush.Color:=clBlack;
     Font.Name := 'arial';
     Font.Color := clGreen;
@@ -134,6 +425,147 @@ begin
     Font.Height := 16;
     TextOut((Self.Width div 2)-(TextWidth(Text) div 2),2,Text);
   end;
+ finally
+   Canvas.Unlock;
+ end; *)
+end;
+
+procedure TMediaDisplay.Render(w, h: SInt32; Data: array of PByte;
+  linesize: array of Integer);
+var
+  BMPFile:TMemoryStream;//TFileStream;
+  BMPHeader:BITMAPFILEHEADER;
+  BMPInfo:TBitmapV4Header;
+  ret:Integer;
+
+  bmp:TBitmap;
+  Graphics : TGPGraphics;
+  Img:TGPBitmap;
+  Text:string;
+
+  TextureID:LongInt;
+  Buffer:BITMAP;
+
+begin
+ if Assigned(CS) then CS.Enter;
+ try
+  bmpheader.bfReserved1 := 0;
+  bmpheader.bfReserved2 := 0;
+  bmpheader.bfType := $4d42;
+  bmpheader.bfOffBits := sizeof(BITMAPFILEHEADER) + sizeof(BITMAPV4HEADER);
+  bmpheader.bfSize := bmpheader.bfOffBits + w*h*32 div 8;
+
+  bmpinfo.bV4Size := sizeof(BITMAPV4HEADER);
+  bmpinfo.bV4Width := w;
+  bmpinfo.bV4Height := -h;
+  bmpinfo.bV4Planes := 1;
+  bmpinfo.bV4BitCount := 32;//24;
+  bmpinfo.bV4V4Compression := BI_BITFIELDS;
+  bmpinfo.bV4SizeImage := 0;
+  bmpinfo.bV4XPelsPerMeter := 100;//2835; // ResolutionHorizontal
+  bmpinfo.bV4YPelsPerMeter := 100;//2835; //ResolutionVertical
+  bmpinfo.bV4ClrUsed := 0;
+  bmpinfo.bV4ClrImportant := 0;
+  BMPInfo.bV4RedMask:=$00FF0000;
+  BMPInfo.bV4GreenMask:=$0000FF00;
+  BMPInfo.bV4BlueMask:=$000000FF;
+  BMPInfo.bV4AlphaMask:=$FF000000;
+  BMPInfo.bV4CSType:=$206E6957;
+  BMPInfo.bV4GammaRed:=0;
+  BMPInfo.bV4GammaGreen:=0;
+  BMPInfo.bV4GammaBlue:=0;
+
+  //BMPFile:=TFileStream.Create(ExtractFilePath(GetCurrentDir)+'TEST'+IntToStr(Random(500))+'.jpg',fmCreate);
+  BMPFile:=TMemoryStream.Create;
+  bmp:=TBitmap.Create;
+
+  //FBitMap.Lock;
+  //Graphics := TGPGraphics.Create(FBitMap.Handle);
+  try
+    BMPFile.WriteBuffer(bmpheader,SizeOf(bmpheader));
+    BMPFile.WriteBuffer(bmpinfo,SizeOf(bmpinfo));
+    BMPFile.WriteBuffer(data[0]^,w*h*32 div 8);
+    BMPFile.Position:=0;
+    BMP.LoadFromStream(BMPFile);
+    glClear(GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT);//GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
+    Self.DrawBitmap(BMP,0,0);
+    (*img:=TGPBitmap.Create(TStreamAdapter.Create(BMPFile));
+    try
+      //FMediaDisplay.RenderBitMap(bmp);
+     Graphics.DrawImage(Img,0,0,w,h);
+     {$ifdef SHOW_MEDIA}
+     Text:=FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,Ceil(FAVPacked.dts * av_q2d(FVideoStrem.time_base)*1000)))+' [FRAME ]';
+     GPEasyTextout(Graphics, Text, MakeRect(1, 1, w*1.0, h*1.0), MakeColor(0, 255, 0), StringAlignmentNear, StringAlignmentNear, 15);
+     Text:=FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,GT))+' [GLOBAL]';
+     GPEasyTextout(Graphics, Text, MakeRect(1, 15, w*1.0, h*1.0), MakeColor(0, 255, 255), StringAlignmentNear, StringAlignmentNear, 15);
+     //GPEasyTextout(Graphics, 'TVideoThread:'+IntToStr(Self.Tag), MakeRect(1, 20, w*1.0, h*1.0), MakeColor(0, 0, 255), StringAlignmentNear, StringAlignmentNear, 10);
+     GPEasyTextout(Graphics, 'Media Component v2.0', MakeRect(1, 1, w*1.0, h*1.0), MakeColor(255, 0, 0), StringAlignmentCenter, StringAlignmentNear, 10);
+     {$endif}
+    finally
+     FreeAndNil(Img);
+    end;*)
+  finally
+    //FBitMap.Unlock;
+    FreeAndNil(BMPFile);
+    FreeAndNil(bmp);
+    FreeAndNil(Graphics);
+  end;
+ finally
+  if Assigned(CS) then CS.Leave;
+ end;
+end;
+
+procedure TMediaDisplay.SetBitmap(BMP: TBitmap);
+var Stream:TMemoryStream;
+begin
+  if not Assigned(RenderBMP) then Exit;
+  CS.Enter;
+  Stream:=TMemoryStream.Create;
+  try
+    BMP.SaveToStream(Stream);
+    Stream.Position:=0;
+    RenderBMP.FreeImage;
+    RenderBMP.LoadFromStream(Stream);
+  finally
+    FreeAndNil(Stream);
+    CS.Leave;
+  end;
+end;
+
+procedure TMediaDisplay.setupPixelFormat(DC: HDC);
+const
+   pfd:TPIXELFORMATDESCRIPTOR = (
+        nSize:sizeof(TPIXELFORMATDESCRIPTOR);	// size
+        nVersion:1;			// version
+        dwFlags:PFD_SUPPORT_OPENGL or PFD_DRAW_TO_WINDOW or
+                PFD_DOUBLEBUFFER;	// support double-buffering
+        iPixelType:PFD_TYPE_RGBA;	// color type
+        cColorBits:32;			// preferred color depth
+        cRedBits:0; cRedShift:0;	// color bits (ignored)
+        cGreenBits:0;  cGreenShift:0;
+        cBlueBits:0; cBlueShift:0;
+        cAlphaBits:0;  cAlphaShift:0;   // no alpha buffer
+        cAccumBits: 0;
+        cAccumRedBits: 0;  		// no accumulation buffer,
+        cAccumGreenBits: 0;     	// accum bits (ignored)
+        cAccumBlueBits: 0;
+        cAccumAlphaBits: 0;
+        cDepthBits:24;			// depth buffer
+        cStencilBits:0;			// no stencil buffer
+        cAuxBuffers:0;			// no auxiliary buffers
+        iLayerType:PFD_MAIN_PLANE;  	// main layer
+   bReserved: 0;
+   dwLayerMask: 0;
+   dwVisibleMask: 0;
+   dwDamageMask: 0;                    // no layer, visible, damage masks
+   );
+var pixelFormat:integer;
+begin
+   pixelFormat := ChoosePixelFormat(DC, @pfd);
+   if (pixelFormat = 0) then
+        exit;
+   if (SetPixelFormat(DC, pixelFormat, @pfd) <> TRUE) then
+        exit;
 end;
 
 end.

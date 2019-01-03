@@ -2,8 +2,8 @@ object Form1: TForm1
   Left = 0
   Top = 0
   Caption = 'Form1'
-  ClientHeight = 233
-  ClientWidth = 600
+  ClientHeight = 393
+  ClientWidth = 590
   Color = clBtnFace
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
@@ -18,17 +18,17 @@ object Form1: TForm1
   object PageControl1: TPageControl
     Left = 0
     Top = 0
-    Width = 600
-    Height = 214
+    Width = 590
+    Height = 374
     ActivePage = TabSheet2
     Align = alClient
     TabOrder = 0
     object TabSheet1: TTabSheet
       Caption = 'LOG'
       object Splitter1: TSplitter
-        Left = 404
+        Left = 394
         Top = 0
-        Height = 186
+        Height = 346
         Align = alRight
         ExplicitLeft = 240
         ExplicitTop = 128
@@ -37,7 +37,7 @@ object Form1: TForm1
       object Splitter2: TSplitter
         Left = 185
         Top = 0
-        Height = 186
+        Height = 346
         ExplicitLeft = 256
         ExplicitTop = 112
         ExplicitHeight = 100
@@ -45,8 +45,8 @@ object Form1: TForm1
       object Memo1: TMemo
         Left = 188
         Top = 0
-        Width = 216
-        Height = 186
+        Width = 206
+        Height = 346
         Align = alClient
         Lines.Strings = (
           'Memo1')
@@ -54,10 +54,10 @@ object Form1: TForm1
         TabOrder = 0
       end
       object Memo2: TMemo
-        Left = 407
+        Left = 397
         Top = 0
         Width = 185
-        Height = 186
+        Height = 346
         Align = alRight
         Lines.Strings = (
           'Memo2')
@@ -68,7 +68,7 @@ object Form1: TForm1
         Left = 0
         Top = 0
         Width = 185
-        Height = 186
+        Height = 346
         Align = alLeft
         Lines.Strings = (
           'Memo3')
@@ -81,15 +81,18 @@ object Form1: TForm1
       ImageIndex = 1
       object TrackBar1: TTrackBar
         Left = 0
-        Top = 160
-        Width = 592
+        Top = 320
+        Width = 582
         Height = 26
+        Hint = 'TEST'
         Align = alBottom
         DoubleBuffered = True
         ParentDoubleBuffered = False
+        ParentShowHint = False
         PageSize = 3
         Position = 10
         SelEnd = 5
+        ShowHint = True
         TabOrder = 0
         TickMarks = tmBoth
         TickStyle = tsNone
@@ -98,8 +101,8 @@ object Form1: TForm1
   end
   object StatusBar1: TStatusBar
     Left = 0
-    Top = 214
-    Width = 600
+    Top = 374
+    Width = 590
     Height = 19
     Panels = <
       item
@@ -165,5 +168,9 @@ object Form1: TForm1
     RadioButtons = <>
     Left = 252
     Top = 152
+  end
+  object OpenDialog2: TOpenDialog
+    Left = 156
+    Top = 160
   end
 end
