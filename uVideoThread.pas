@@ -229,9 +229,9 @@ begin
            Continue;
           end;
           //Render := avcodec_decode_video2(FVideoStrem^.codec, FAVFrame, FGotFrame, FAVPacked) > 0;
-          if not isTimeFail then Render := FOnDecodeFrame(self,FAVPacked,FAVFrame,FGotFrame) > 0
-          else Render:=False;
-          //Render := FOnDecodeFrame(self,FAVPacked,FAVFrame,FGotFrame) > 0;
+          {if not isTimeFail then Render := FOnDecodeFrame(self,FAVPacked,FAVFrame,FGotFrame) > 0
+          else Render:=False;}
+          Render := FOnDecodeFrame(self,FAVPacked,FAVFrame,FGotFrame) > 0;
 			(*IF Assigned(CS) then CS.Enter;
 			try
 				//Render := FOnDecodeFrame(self,FAVPacked,FAVFrame,FGotFrame) > 0;
@@ -503,6 +503,10 @@ var
 
   TextureID:LongInt;
   Buffer:BITMAP;
+  res: Integer;
+
+  LineByte:TArray<TArray<Byte>>;
+  I: Integer;
 
 begin Result:=0;
   if not Assigned(FBitMap) then Exit;
@@ -542,7 +546,15 @@ begin Result:=0;
   try
     BMPFile.WriteBuffer(bmpheader,SizeOf(bmpheader));
     BMPFile.WriteBuffer(bmpinfo,SizeOf(bmpinfo));
-    BMPFile.WriteBuffer(data[0]^,w*h*32 div 8);
+    SetLength(LineByte,h);
+    for I := 0 to h-1 do begin
+      SetLength(LineByte[i],w*32 div 8);
+      CopyMemory(LineByte[i],data[0]+((w*32 div 8)*i),w*32 div 8);
+    end;
+    for I := High(LineByte) downto 0 do begin
+      BMPFile.WriteData(LineByte[i],w*32 div 8);
+    end;
+    //BMPFile.WriteBuffer(data[0]^,w*h*32 div 8);
     BMPFile.Position:=0;
     BMP.LoadFromStream(BMPFile);
     (* OpenGL > *)
