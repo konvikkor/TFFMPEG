@@ -6,6 +6,8 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants,
   System.Classes, Vcl.Graphics,
 
+  OpenGl,
+
   Vcl.ExtCtrls,Math,System.SyncObjs,System.Generics.Collections,
 
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, FFTypes, FFUtils, System.DateUtils,

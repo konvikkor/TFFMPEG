@@ -145,7 +145,7 @@ begin
    BMP:=TBitmap.Create;
    try
     BMP.LoadFromFile(OpenDialog2.FileName);
-    MediaDisplay.SetBitmap(BMP);
+    MediaDisplay.SetBitmap(BMP,0,0);
    finally
      FreeAndNil(BMP);
    end;

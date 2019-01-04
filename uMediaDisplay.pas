@@ -40,6 +40,8 @@ type
     CS:TCriticalSection;
     FAutoInitSDL: Boolean;
     RenderBMP:TBitmap;
+    FASCIICharList: GLuint;
+    GlobalTime,PackTime:Cardinal;
   protected
     procedure Paint; override;
     procedure CreateWnd; override;
@@ -67,7 +69,8 @@ type
     function DrawBitmapTex(texId: GLuint; x, y, w, h: Integer): TMediaDisplay; overload;
     function DrawBitmapTex(bmp: TBitmap; x, y, w, h: Integer): TMediaDisplay; overload;
     Procedure BeginRender;
-    Procedure SetBitmap(BMP:TBitmap);
+    Procedure SetBitmap(BMP:TBitmap;GlobalTime,PackTime:Cardinal);
+    function TextOut(const text: WideString; x, y: Integer; red, green, blue, alpha: Single): TMediaDisplay;
     Procedure EndRender;
   published
     Property AutoInitSDL:Boolean Read FAutoInitSDL Write FAutoInitSDL default true;
@@ -110,7 +113,6 @@ end;*)
 procedure TMediaDisplay.BeginRender;
 begin
  CS.Enter;
- glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //ќчистка буфера цвета и глубины
 end;
 
 function TMediaDisplay.BuildTexture(bmp: TBitmap;
@@ -123,9 +125,19 @@ begin
    glPixelStorei(GL_PACK_ALIGNMENT, 1);
    // Typical Texture Generation Using Data From The Bitmap
    glBindTexture(GL_TEXTURE_2D, texId);        // Bind To The Texture ID
+   (* TEST ADD > *)
+   //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+   //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+   (* TEST ADD < *)
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Linear Min Filter
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Linear Mag Filter
-   glTexImage2D(GL_TEXTURE_2D, 0, 3, bmpInfo.bmWidth, bmpInfo.bmHeight, 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
+   if bmpInfo.bmBitsPixel = 32 then
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_BGRA_EXT, bmpInfo.bmWidth, bmpInfo.bmHeight, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits)
+   else
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_BGR_EXT, bmpInfo.bmWidth, bmpInfo.bmHeight, 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
+   (* TEST > *)
+   //glGenerateMipmap(GL_TEXTURE_2D);
+   (* TEST < *)
    Result := Self;
 end;
 
@@ -244,20 +256,20 @@ var
    tex: GLuint;
 begin
    glColor3f(1.0, 1.0, 1.0);
-   glDisable(GL_BLEND);
-   glEnable(GL_TEXTURE_2D);
+   //glDisable(GL_BLEND);
+   //glEnable(GL_TEXTURE_2D);
    BuildTexture(bmp, tex);
 
    glBegin(GL_QUADS);
-   glTexCoord2f(0.0, 0.0); glVertex3i(x, y, 0);
-   glTexCoord2f(1.0, 0.0); glVertex3f(x + w, y, 0);
-   glTexCoord2f(1.0, 1.0); glVertex3f(x + w, y + h, 0);
-   glTexCoord2f(0.0, 1.0); glVertex3f(x, y + h, 0);
+    glTexCoord2f(0.0, 0.0); glVertex3i(x, y, 0);
+    glTexCoord2f(1.0, 0.0); glVertex3f(x + w, y, 0);
+    glTexCoord2f(1.0, 1.0); glVertex3f(x + w, y + h, 0);
+    glTexCoord2f(0.0, 1.0); glVertex3f(x, y + h, 0);
    glEnd;
 
    glDeleteTextures(1, @tex);
-   glDisable(GL_TEXTURE_2D);
-   glEnable(GL_BLEND);
+   //glDisable(GL_TEXTURE_2D);
+   //glEnable(GL_BLEND);
    //SetBlendState(FBlend);
    //glColor4fv(@FPenColor); // Restore color
    Result := Self;
@@ -279,14 +291,13 @@ begin
    glEnd;
 
    glDisable(GL_TEXTURE_2D);
-   //glEnable(GL_BLEND);
+   glEnable(GL_BLEND);
    //glColor4fv(@FPenColor); // Restore color
    Result := Self;
 end;
 
 procedure TMediaDisplay.EndRender;
 begin
- SwapBuffers(wglGetCurrentDC);
  CS.Leave;
 end;
 
@@ -352,41 +363,79 @@ end;
 
 procedure TMediaDisplay.OnTimer(Sender: TObject);
 var  x,y:Integer;
-begin
-  //glClear(GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT);
-  if not Assigned(RenderBMP) then exit;
-  if RenderBMP.Empty then exit;
-  BeginRender;
-  //glClear(GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
-  //glLoadIdentity;
+  Text:AnsiString;
+  Texture:Cardinal;
+  bmpInfo: BITMAP;
+begin x:=0; y:=0; Texture:=0;
+  //glColor3f(1.0,0.0,0.0);
+  glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //ќчистка буфера цвета и глубины
+
   glMatrixMode(GL_MODELVIEW);
-  x:=-RenderBMP.Width div 2;
-  y:=-RenderBMP.Height div 2;
-  DrawBitmap(RenderBMP,x,y);
-  //SwapBuffers(HDC);
-  EndRender;
+  glLoadIdentity;
+  TextOut('Media Display ['+FormatDateTime('hh.mm.ss.zzz',Time)+']',-ClientWidth div 2 + 5,ClientHeight div 2 - 15,-128,11,0,0);
+  TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,GlobalTime))+'] Global',-ClientWidth div 2 + 5,ClientHeight div 2 - 30,1,0,1,0);
+  TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,PackTime))+'] Packed',-ClientWidth div 2 + 5,ClientHeight div 2 - 45,1,1,0,0);
+  if Assigned(RenderBMP) then begin
+    BeginRender;
+    try
+     if not RenderBMP.Empty then begin
+      (* Draw IMG > *)
+      x:=-RenderBMP.Width div 2;
+      y:=-RenderBMP.Height div 2;
+      DrawBitmap(RenderBMP,x,y);
+      {x:=RenderBMP.Width;
+      y:=RenderBMP.Height;
+      glColor3f(0.7,0.7,0.7);
+      glEnable(GL_TEXTURE_2D);
+      glDisable(GL_TEXTURE_2D);
+      glGenTextures(1,@Texture);
+      glBindTexture(GL_TEXTURE_2D,Texture);
+      GetObject(RenderBMP.Handle, SizeOf(bmpInfo), @bmpInfo);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_BLEND);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0,GL_RGBA, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
+      glBegin(GL_QUADS);
+        glTexCoord2f(0, 0);
+        glVertex3f(-x/2, -y/2, 0);
+        glTexCoord2f(1, 0);
+        glVertex3f(x/2, -y/2, 0);
+        glTexCoord2f(1, 1);
+        glVertex3f(x/2, y/2, 0);
+        glTexCoord2f(0, 1);
+        glVertex3f(-x/2, y/2, 0);
+      glEnd;}
+      //DrawBitmapTex(RenderBMP,-x div 2,-y div 2,x,y);
+      //gluLookAt(0,0,-10,0,0,0,0,0,0);
+      (* Draw IMG < *)
+      (*BuildTexture(RenderBMP,Texture);
+      DrawBitmapTex(Texture,-x div 2,-y div 2,x,y);
+      DeleteTexture(Texture);*)
+     end;
+    finally
+      EndRender;
+    end;
+  end;
+  //SwapBuffers(wglGetCurrentDC);
   //glFlush;
   //Application.ProcessMessages;
+  SwapBuffers(HDC);
 end;
 
 procedure TMediaDisplay.Paint;
 var Rect: TRect;
   Text:string;
 begin
-  glClearColor (0.5, 0.5, 0.75, 1.0); //÷вет фона
+  //glClearColor (0.5, 0.5, 0.75, 1.0); //÷вет фона
+  glClearColor (0, 0, 0, 1.0); //÷вет фона
   glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //ќчистка буфера цвета и глубины
   glLoadIdentity;
   glViewport(0,0,ClientWidth,ClientHeight); // размеры экрана что будем показывать
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity;
-  (*glOrtho(-ClientWidth div 2,
-            ClientWidth div 2,
-            -ClientHeight div 2,
-            ClientHeight div 2,-800,800);   //центровка в ноль по центру экрана*)
-  gluOrtho2D(-ClientWidth div 2,
-            ClientWidth div 2,
-            -ClientHeight div 2,
-            ClientHeight div 2);   //центровка в ноль по центру экрана*)
+  glOrtho(-ClientWidth div 2,ClientWidth div 2,-ClientHeight div 2,ClientHeight div 2,-800,800);   //центровка в ноль по центру экрана*)
+  //gluOrtho2D(-ClientWidth div 2,ClientWidth div 2,-ClientHeight div 2,ClientHeight div 2);   //центровка в ноль по центру экрана*)
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity;
   //glTranslatef(0.0,0.0,-10.0);
@@ -515,11 +564,13 @@ begin
  end;
 end;
 
-procedure TMediaDisplay.SetBitmap(BMP: TBitmap);
+procedure TMediaDisplay.SetBitmap(BMP: TBitmap;GlobalTime,PackTime:Cardinal);
 var Stream:TMemoryStream;
 begin
   if not Assigned(RenderBMP) then Exit;
   CS.Enter;
+  Self.GlobalTime:=GlobalTime;
+  Self.PackTime:=PackTime;
   Stream:=TMemoryStream.Create;
   try
     BMP.SaveToStream(Stream);
@@ -566,6 +617,38 @@ begin
         exit;
    if (SetPixelFormat(DC, pixelFormat, @pfd) <> TRUE) then
         exit;
+end;
+
+function TMediaDisplay.TextOut(const text: WideString; x,
+  y: Integer; red, green, blue, alpha: Single): TMediaDisplay;
+var
+   i: Integer;
+   GLList: GLuint;
+   Font:TFont;
+begin
+ Font:=TFont.Create;
+ try
+  Font.Style:=[fsBold];
+  Font.Size:=10;
+  Font.Color:=clGreen;
+  SelectObject(HDC, Font.Handle);
+  GLList := glGenLists(MaxChar);
+  wglUseFontBitmaps(HDC, 0, MaxChar, GLList);
+
+  glPushMatrix;
+  glLoadIdentity;
+  glColor4f(red, green, blue, alpha);
+  glRasterPos2i(x, y);
+  for i := 1 to Length(text) do
+    glCallList(GLList + Ord(text[i]));
+  glPopMatrix;
+
+  glDeleteLists(GLList, MaxChar);
+  //glColor4fv(@FPenColor);
+  Result := Self;
+ finally
+   FreeAndNil(Font);
+ end;
 end;
 
 end.
