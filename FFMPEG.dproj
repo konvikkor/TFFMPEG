@@ -126,8 +126,11 @@
         <DCCReference Include="rtl.dcp"/>
         <DCCReference Include="vcl.dcp"/>
         <DCCReference Include="fmx.dcp"/>
-        <DCCReference Include="uFFMPG.pas"/>
-        <DCCReference Include="uFFMpegThead.pas"/>
+        <DCCReference Include="uMediaConstant.pas"/>
+        <DCCReference Include="uMediaDisplay.pas"/>
+        <DCCReference Include="uMediaReader.pas"/>
+        <DCCReference Include="uVideoMain.pas"/>
+        <DCCReference Include="uVideoThread.pas"/>
         <RcItem Include="fC.bmp">
             <ResourceType>BITMAP</ResourceType>
             <ResourceId>TMyFFMpeg</ResourceId>

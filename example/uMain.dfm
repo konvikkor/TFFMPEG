@@ -38,21 +38,6 @@ object Form1: TForm1
     Height = 19
     Panels = <>
   end
-  object MyFFMpegDisplay1: TMyFFMpegDisplay
-    Left = 0
-    Top = 0
-    Width = 635
-    Height = 396
-    PopupMenu = PopupMenu1
-    Align = alClient
-    ExplicitTop = -3
-  end
-  object MyFFMpeg1: TMyFFMpeg
-    Display = MyFFMpegDisplay1
-    Seek = 0
-    Left = 128
-    Top = 144
-  end
   object PopupMenu1: TPopupMenu
     Left = 248
     Top = 152

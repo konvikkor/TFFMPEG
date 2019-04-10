@@ -9,7 +9,6 @@ uses
 
 type
   TForm1 = class(TForm)
-    MyFFMpeg1: TMyFFMpeg;
     PopupMenu1: TPopupMenu;
     File1: TMenuItem;
     Open1: TMenuItem;
@@ -21,7 +20,6 @@ type
     Memo1: TMemo;
     StatusBar1: TStatusBar;
     Splitter1: TSplitter;
-    MyFFMpegDisplay1: TMyFFMpegDisplay;
     procedure Open1Click(Sender: TObject);
     procedure Play1Click(Sender: TObject);
     procedure Stop1Click(Sender: TObject);

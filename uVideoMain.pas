@@ -90,10 +90,17 @@ type
 
 function DurationToStr(ADuration: Int64): string;
 
+procedure Register;
+
 implementation
 
 uses
   uMediaReader;
+
+procedure Register;
+begin
+  RegisterComponents('MY Media',[TMediaDecoder]);
+end;
 
 function DurationToStr(ADuration: Int64): string;
 var

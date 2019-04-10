@@ -31,6 +31,7 @@ type
     TrackBar1: TTrackBar;
     Stop1: TMenuItem;
     OpenDialog2: TOpenDialog;
+    TabSheet3: TTabSheet;
     procedure Open1Click(Sender: TObject);
     procedure DecodePak1Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
@@ -159,6 +160,7 @@ begin
   //MediaDisplay.AutoInitSDL:=False;
   MediaDisplay.Parent:=TabSheet2;
   MediaDisplay.Align:=alClient;
+  MediaDisplay.DrawInfo:=True;
   //MediaDisplay.DeInitSDL;
   Application.ProcessMessages;
   //MediaDisplay.InitSDL;

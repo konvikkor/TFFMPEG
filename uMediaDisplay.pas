@@ -7,7 +7,7 @@ uses
   System.Classes, Vcl.Graphics,
 
   uMediaConstant,
-  Winapi.GDIPOBJ, Winapi.GDIPAPI, OpenGL,
+  Winapi.GDIPOBJ, Winapi.GDIPAPI, OpenGL, System.TimeSpan,
   //Winapi.D3D11Shader, Winapi.D3D11,
 
   Vcl.ExtCtrls,Math,System.SyncObjs,System.Generics.Collections,
@@ -42,6 +42,8 @@ type
     RenderBMP:TBitmap;
     FASCIICharList: GLuint;
     GlobalTime,PackTime:Cardinal;
+    FDrawInfo: Boolean;
+    CalcFPS:Double;
   protected
     procedure Paint; override;
     procedure CreateWnd; override;
@@ -52,6 +54,7 @@ type
     Procedure DeInitSDL;
     procedure setupPixelFormat(DC:HDC);
     Procedure OnTimer(Sender:TObject);
+    Procedure WMUpdateRender(var Message: TWMEraseBkgnd);message WM_PAINT_FRAME;
   public
     HDC:HDC;
     RC:HGLRC;
@@ -69,11 +72,13 @@ type
     function DrawBitmapTex(texId: GLuint; x, y, w, h: Integer): TMediaDisplay; overload;
     function DrawBitmapTex(bmp: TBitmap; x, y, w, h: Integer): TMediaDisplay; overload;
     Procedure BeginRender;
+    Procedure UpdateRender;
     Procedure SetBitmap(BMP:TBitmap;GlobalTime,PackTime:Cardinal);
     function TextOut(const text: WideString; x, y: Integer; red, green, blue, alpha: Single): TMediaDisplay;
     Procedure EndRender;
   published
-    Property AutoInitSDL:Boolean Read FAutoInitSDL Write FAutoInitSDL default true;
+    //Property AutoInitSDL:Boolean Read FAutoInitSDL Write FAutoInitSDL default true;
+    Property DrawInfo:Boolean Read FDrawInfo Write FDrawInfo default false;
     property Anchors;
     property OnContextPopup;
     property PopupMenu;
@@ -86,7 +91,14 @@ type
     property Align;
   end;
 
+procedure Register;
+
 implementation
+
+procedure Register;
+begin
+  RegisterComponents('MY Media',[TMediaDisplay]);
+end;
 
 { TMediaDisplay }
 
@@ -174,9 +186,9 @@ begin
   //glEnable(GL_ALPHA_TEST);
   glShadeModel(GL_SMOOTH);
   glEnable(GL_TEXTURE_2D);
-  Timer:=TTimer.Create(self);
+  {Timer:=TTimer.Create(self);
   Timer.OnTimer:=OnTimer;
-  Timer.Interval:=20;
+  Timer.Interval:=20;}
   (*glClearColor (0.5, 0.5, 0.75, 1.0); //Цвет фона
   glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //Очистка буфера цвета и глубины
   glLoadIdentity;
@@ -362,65 +374,8 @@ begin
 end;
 
 procedure TMediaDisplay.OnTimer(Sender: TObject);
-var  x,y:Integer;
-  Text:AnsiString;
-  Texture:Cardinal;
-  bmpInfo: BITMAP;
-begin x:=0; y:=0; Texture:=0;
-  //glColor3f(1.0,0.0,0.0);
-  glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //Очистка буфера цвета и глубины
-
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity;
-  TextOut('Media Display ['+FormatDateTime('hh.mm.ss.zzz',Time)+']',-ClientWidth div 2 + 5,ClientHeight div 2 - 15,-128,11,0,0);
-  TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,GlobalTime))+'] Global',-ClientWidth div 2 + 5,ClientHeight div 2 - 30,1,0,1,0);
-  TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,PackTime))+'] Packed',-ClientWidth div 2 + 5,ClientHeight div 2 - 45,1,1,0,0);
-  if Assigned(RenderBMP) then begin
-    BeginRender;
-    try
-     if not RenderBMP.Empty then begin
-      (* Draw IMG > *)
-      x:=-RenderBMP.Width div 2;
-      y:=-RenderBMP.Height div 2;
-      DrawBitmap(RenderBMP,x,y);
-      {x:=RenderBMP.Width;
-      y:=RenderBMP.Height;
-      glColor3f(0.7,0.7,0.7);
-      glEnable(GL_TEXTURE_2D);
-      glDisable(GL_TEXTURE_2D);
-      glGenTextures(1,@Texture);
-      glBindTexture(GL_TEXTURE_2D,Texture);
-      GetObject(RenderBMP.Handle, SizeOf(bmpInfo), @bmpInfo);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-      glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_BLEND);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0,GL_RGBA, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
-      glBegin(GL_QUADS);
-        glTexCoord2f(0, 0);
-        glVertex3f(-x/2, -y/2, 0);
-        glTexCoord2f(1, 0);
-        glVertex3f(x/2, -y/2, 0);
-        glTexCoord2f(1, 1);
-        glVertex3f(x/2, y/2, 0);
-        glTexCoord2f(0, 1);
-        glVertex3f(-x/2, y/2, 0);
-      glEnd;}
-      //DrawBitmapTex(RenderBMP,-x div 2,-y div 2,x,y);
-      //gluLookAt(0,0,-10,0,0,0,0,0,0);
-      (* Draw IMG < *)
-      (*BuildTexture(RenderBMP,Texture);
-      DrawBitmapTex(Texture,-x div 2,-y div 2,x,y);
-      DeleteTexture(Texture);*)
-     end;
-    finally
-      EndRender;
-    end;
-  end;
-  //SwapBuffers(wglGetCurrentDC);
-  //glFlush;
-  //Application.ProcessMessages;
-  SwapBuffers(HDC);
+begin
+  Self.UpdateRender;
 end;
 
 procedure TMediaDisplay.Paint;
@@ -649,6 +604,78 @@ begin
  finally
    FreeAndNil(Font);
  end;
+end;
+
+procedure TMediaDisplay.UpdateRender;
+var  x,y:Integer;
+  Text:AnsiString;
+  Texture:Cardinal;
+  FPS:Double;
+  bmpInfo: BITMAP;
+begin x:=0; y:=0; Texture:=0;
+  //glColor3f(1.0,0.0,0.0);
+  glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //Очистка буфера цвета и глубины
+
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity;
+  FPS:=Round(TTimeSpan.Subtract(GetTime,Self.CalcFPS).Milliseconds);
+  Self.CalcFPS:=GetTime;
+  TextOut('Media Display ['+FormatDateTime('hh.mm.ss.zzz',Time)+'] FPS:'+FloatToStr(FPS),-ClientWidth div 2 + 5,ClientHeight div 2 - 15,-128,11,0,0);
+  if FDrawInfo then begin
+    TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,GlobalTime))+'] Global',-ClientWidth div 2 + 5,ClientHeight div 2 - 30,1,0,1,0);
+    TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,PackTime))+'] Packed',-ClientWidth div 2 + 5,ClientHeight div 2 - 45,1,1,0,0);
+  end;
+  if Assigned(RenderBMP) then begin
+    BeginRender;
+    try
+     if not RenderBMP.Empty then begin
+      (* Draw IMG > *)
+      x:=-RenderBMP.Width div 2;
+      y:=-RenderBMP.Height div 2;
+      DrawBitmap(RenderBMP,x,y);
+      {x:=RenderBMP.Width;
+      y:=RenderBMP.Height;
+      glColor3f(0.7,0.7,0.7);
+      glEnable(GL_TEXTURE_2D);
+      glDisable(GL_TEXTURE_2D);
+      glGenTextures(1,@Texture);
+      glBindTexture(GL_TEXTURE_2D,Texture);
+      GetObject(RenderBMP.Handle, SizeOf(bmpInfo), @bmpInfo);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_BLEND);
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0,GL_RGBA, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
+      glBegin(GL_QUADS);
+        glTexCoord2f(0, 0);
+        glVertex3f(-x/2, -y/2, 0);
+        glTexCoord2f(1, 0);
+        glVertex3f(x/2, -y/2, 0);
+        glTexCoord2f(1, 1);
+        glVertex3f(x/2, y/2, 0);
+        glTexCoord2f(0, 1);
+        glVertex3f(-x/2, y/2, 0);
+      glEnd;}
+      //DrawBitmapTex(RenderBMP,-x div 2,-y div 2,x,y);
+      //gluLookAt(0,0,-10,0,0,0,0,0,0);
+      (* Draw IMG < *)
+      (*BuildTexture(RenderBMP,Texture);
+      DrawBitmapTex(Texture,-x div 2,-y div 2,x,y);
+      DeleteTexture(Texture);*)
+     end;
+    finally
+      EndRender;
+    end;
+  end;
+  //SwapBuffers(wglGetCurrentDC);
+  //glFlush;
+  //Application.ProcessMessages;
+  SwapBuffers(HDC);
+end;
+
+procedure TMediaDisplay.WMUpdateRender(var Message: TWMEraseBkgnd);
+begin
+  UpdateRender;
 end;
 
 end.

@@ -34,7 +34,10 @@ requires
   fmx;
 
 contains
-  uFFMPG in 'uFFMPG.pas',
-  uFFMpegThead in 'uFFMpegThead.pas';
+  uMediaConstant in 'uMediaConstant.pas',
+  uMediaDisplay in 'uMediaDisplay.pas',
+  uMediaReader in 'uMediaReader.pas',
+  uVideoMain in 'uVideoMain.pas',
+  uVideoThread in 'uVideoThread.pas';
 
 end.

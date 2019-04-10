@@ -25,6 +25,9 @@ uses
 
 
 const
+
+  WM_PAINT_FRAME = WM_USER + 0;
+
   MAX_AUDIO_FRAME_SIZE = 192000; // 1 second of 48khz 32bit audio
   MODULE_VERSION = '2.0';
   //WM_DecodeFrame = WM_USER+0;

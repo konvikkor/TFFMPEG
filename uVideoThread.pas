@@ -567,6 +567,7 @@ begin Result:=0;
     //wglMakeCurrent(FMediaDisplay.HDC, FMediaDisplay.RC);
     //glClear(GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT);//GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT);
     FMediaDisplay.SetBitmap(bmp,GT,Round((FAVPacked.dts * (FVideoStrem.time_base.num / FVideoStrem.time_base.den)) * 1000));
+    PostMessage(FMediaDisplay.Handle,WM_PAINT_FRAME,0,0);
     //SwapBuffers(Self.FMediaDisplay.HDC);
     (* OpenGL < *)
     (*img:=TGPBitmap.Create(TStreamAdapter.Create(BMPFile));
