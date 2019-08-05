@@ -7,7 +7,8 @@ uses
   uMediaDisplay in 'uMediaDisplay.pas',
   uMediaConstant in 'uMediaConstant.pas',
   uVideoThread in 'uVideoThread.pas',
-  uMediaReader in 'uMediaReader.pas';
+  uMediaReader in 'uMediaReader.pas',
+  uMediaTimeLine in 'uMediaTimeLine.pas';
 
 {$R *.res}
 

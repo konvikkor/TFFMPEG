@@ -101,10 +101,6 @@ object Form1: TForm1
     object TabSheet3: TTabSheet
       Caption = 'TabSheet3'
       ImageIndex = 2
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
     end
   end
   object StatusBar1: TStatusBar
