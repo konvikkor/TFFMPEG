@@ -37,11 +37,13 @@ type
     FDrawInfo: Boolean;
     CalcFPS:Double;
   protected
+    RenderBitmap:BITMAP;
     procedure Paint; override;
     procedure CreateWnd; override;
     procedure DestroyWnd; override;
     //Function CaslcSize(Sourse:TSDL_Rect):TSDL_Rect;
     //procedure OnRenderVideo(var Data:PMediaBufferInfo);
+    function GetSizeProporcional(Source_x,Source_y:Integer):TPoint;
     Procedure InitSDL;
     Procedure DeInitSDL;
     procedure setupPixelFormat(DC:HDC);
@@ -68,6 +70,7 @@ type
     Procedure SetBitmap(BMP:TBitmap;GlobalTime,PackTime:Cardinal);
     function TextOut(const text: WideString; x, y: Integer; red, green, blue, alpha: Single): TMediaDisplay;
     Procedure EndRender;
+    function Bitmap2PixelArray(Source:TBitmap):BITMAP;
   published
     //Property AutoInitSDL:Boolean Read FAutoInitSDL Write FAutoInitSDL default true;
     Property DrawInfo:Boolean Read FDrawInfo Write FDrawInfo default false;
@@ -117,6 +120,11 @@ end;*)
 procedure TMediaDisplay.BeginRender;
 begin
  CS.Enter;
+end;
+
+function TMediaDisplay.Bitmap2PixelArray(Source: TBitmap): BITMAP;
+begin
+  GetObject(Source.Handle, SizeOf(Result), @Result);
 end;
 
 function TMediaDisplay.BuildTexture(bmp: TBitmap;
@@ -174,10 +182,19 @@ begin
   //glMatrixMode(GL_MODELVIEW);
   //glLoadIdentity;
   //gluLookAt(0,0,5,0,0,0,0,0,1); //Позиция наблюдения
-  glEnable(GL_DEPTH_TEST);
+  glEnable(GL_DEPTH_TEST); // включаем проверку разрешения фигур (впереди стоящая закрывает фигуру за ней)
+  glEnable(GL_ALPHA_TEST); //разрешаем альфа-тест
+  glAlphaFunc(GL_GREATER,0.0);  // устанавливаем параметры
+  glEnable (GL_BLEND);     //Включаем режим смешивания цветов
+  glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) ; //параметры смешивания
+  glDepthFunc(GL_LEQUAL); //тип проверки
   //glEnable(GL_ALPHA_TEST);
-  glShadeModel(GL_SMOOTH);
-  glEnable(GL_TEXTURE_2D);
+  //glShadeModel(GL_FLAT); //Режим без сглаживания
+  //или
+  glShadeModel(GL_SMOOTH); //Сглаживание. По умолчанию установлен режим GL_SMOOTH.
+  glEnable(GL_TEXTURE_2D); //разрешить режим наложения текстуры
+  (* Освещение *)
+  glEnable(GL_LIGHTING);
   {Timer:=TTimer.Create(self);
   Timer.OnTimer:=OnTimer;
   Timer.Interval:=20;}
@@ -240,16 +257,44 @@ function TMediaDisplay.DrawBitmap(bmp: TBitmap; x, y: Integer; xZoom,
   yZoom: Single): TMediaDisplay;
 var
    bmpInfo: BITMAP;
+   res:TPoint;
+   texId:GLuint;
 begin
    GetObject(bmp.Handle, SizeOf(bmpInfo), @bmpInfo);
+   res:=GetSizeProporcional(bmp.Width, bmp.Height);
    glPixelZoom(xZoom, yZoom);
    glPushMatrix;
    glLoadIdentity;
    glRasterPos2i(x, y);
-   if bmpInfo.bmBitsPixel = 32 then
-     glDrawPixels(bmp.Width, bmp.Height, GL_BGRA_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits)
-   else
-     glDrawPixels(bmp.Width, bmp.Height, GL_BGR_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
+   Self.RenderBMP.Assign(bmp);
+   Self.RenderBMP.Dormant;
+   Self.RenderBitmap:=Bitmap2PixelArray(Self.RenderBMP);
+   glPixelStorei(GL_PACK_ALIGNMENT, 1);
+   // Typical Texture Generation Using Data From The Bitmap
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Linear Min Filter
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Linear Mag Filter
+   if bmpInfo.bmBitsPixel = 32 then begin
+     //glDrawPixels(bmp.Width, bmp.Height, GL_BGRA_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits)
+     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, bmp.Width, bmp.Height, 0, GL_RGB, GL_UNSIGNED_BYTE, Self.RenderBitmap.bmBits);
+   end else begin
+     //glDrawPixels(bmp.Width, bmp.Height, GL_BGR_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
+     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, bmp.Width, bmp.Height, 0, GL_RGB, GL_UNSIGNED_BYTE, Self.RenderBitmap.bmBits);
+   end;
+   glGenTextures(1, @texId);
+   glBindTexture(GL_TEXTURE_2D, texId);        // Bind To The Texture ID
+   //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+   glBegin(GL_QUADS);
+    {glNormal3f( 0.0, 0.0, 1.0);
+    glTexCoord2f(0.0, 0.0); glVertex3f(-1.0, -1.0,  1.0);
+    glTexCoord2f(1.0, 0.0); glVertex3f( 1.0, -1.0,  1.0);
+    glTexCoord2f(1.0, 1.0); glVertex3f( 1.0,  1.0,  1.0);
+    glTexCoord2f(0.0, 1.0); glVertex3f(-1.0,  1.0,  1.0);}
+    glNormal3f( 0.0, 0.0, 1.0);
+    glTexCoord2f(0.0, 0.0); glVertex3f(-(res.X-5), -(res.Y-5),  1.0);
+    glTexCoord2f(1.0, 0.0); glVertex3f( (res.X-5), -(res.Y-5),  1.0);
+    glTexCoord2f(1.0, 1.0); glVertex3f( (res.X-5),  (res.Y-5),  1.0);
+    glTexCoord2f(0.0, 1.0); glVertex3f(-(res.X-5),  (res.Y-5),  1.0);
+   glEnd;
    glPopMatrix;
    Result := Self;
 end;
@@ -320,6 +365,21 @@ begin
  Result:=FSDLPantalla;
 end;
 
+function TMediaDisplay.GetSizeProporcional(Source_x, Source_y: Integer): TPoint;
+var p:Double;
+begin
+  Result.x := Source_x;
+  Result.y := Source_y;
+  p := (Self.Width * 100) / Result.x;
+  Result.x := round((Result.x * p) / 100);
+  Result.y := round((Result.y * p) / 100);
+  if Result.y > Self.Height then begin
+    p := (Self.Height * 100) / Result.y;
+    Result.x := round((Result.x * p) / 100);
+    Result.y := round((Result.y * p) / 100);
+  end;
+end;
+
 procedure TMediaDisplay.InitSDL;
 begin
   //if not Self.Showing then exit;
@@ -377,14 +437,29 @@ begin
   //glClearColor (0.5, 0.5, 0.75, 1.0); //Цвет фона
   glClearColor (0, 0, 0, 1.0); //Цвет фона
   glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //Очистка буфера цвета и глубины
-  glLoadIdentity;
+  glLoadIdentity; //Сбрасываем текущую матрицу
   glViewport(0,0,ClientWidth,ClientHeight); // размеры экрана что будем показывать
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity;
+  glMatrixMode(GL_PROJECTION); //переходим в матрицу проекции
+  glLoadIdentity; //Сбрасываем текущую матрицу
   glOrtho(-ClientWidth div 2,ClientWidth div 2,-ClientHeight div 2,ClientHeight div 2,-800,800);   //центровка в ноль по центру экрана*)
   //gluOrtho2D(-ClientWidth div 2,ClientWidth div 2,-ClientHeight div 2,ClientHeight div 2);   //центровка в ноль по центру экрана*)
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity;
+  glMatrixMode(GL_MODELVIEW);  // переходим в модельную матрицу
+  glLoadIdentity; //Сбрасываем текущую матрицу
+  //gluLookAt(5,5,5,0,0,0,0,0,1); //позиция наблюдателя
+  (* Перемещение *)
+  //glTranslatef(x, y, z) где x, y, z –вектор смещения всей системы координат. сдвинем в сторону.
+  //запоминания текущей системы координат glPushMatrix и восстановления glPopMatrix
+  //glRotatef(угол, x, y, z) где x, y, z – координаты оси поворота
+  (* Освещение *)
+  glEnable(GL_LIGHT0); //включаем источник света №0
+
+  (*
+    glpushMatrix; //Запомнили
+    glTranslatef(0,-5,0); //Сместили
+      Рисуем додекаэдр
+    glPopmatrix; //Восстановили
+  *)
+
   //glTranslatef(0.0,0.0,-10.0);
   (* Test OpenGL > *)
   (*glBegin(GL_QUADS);
@@ -552,10 +627,10 @@ const
         cStencilBits:0;			// no stencil buffer
         cAuxBuffers:0;			// no auxiliary buffers
         iLayerType:PFD_MAIN_PLANE;  	// main layer
-   bReserved: 0;
-   dwLayerMask: 0;
-   dwVisibleMask: 0;
-   dwDamageMask: 0;                    // no layer, visible, damage masks
+        bReserved: 0;
+        dwLayerMask: 0;
+        dwVisibleMask: 0;
+        dwDamageMask: 0;                    // no layer, visible, damage masks
    );
 var pixelFormat:integer;
 begin
