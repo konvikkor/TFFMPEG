@@ -31,7 +31,8 @@ package FFMPEG;
 requires
   rtl,
   vcl,
-  fmx;
+  fmx,
+  rtpFFMPEG;
 
 contains
   uMediaConstant in 'uMediaConstant.pas',

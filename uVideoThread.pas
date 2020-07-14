@@ -11,18 +11,10 @@ uses
 
   Vcl.ExtCtrls,Math,System.SyncObjs,System.Generics.Collections,
 
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, FFTypes, FFUtils, System.DateUtils,
-  libavcodec, libavcodec_avfft, libavdevice, libavfilter, libavfilter_avcodec,
-  libavfilter_buffersink, libavfilter_buffersrc, libavfilter_formats,
-  libavformat, libavformat_avio, libavformat_url, libavutil,
-  libavutil_audio_fifo, libavutil_avstring, libavutil_bprint, libavutil_buffer,
-  libavutil_channel_layout, libavutil_common, libavutil_cpu, libavutil_dict,
-  libavutil_display, libavutil_error, libavutil_eval, libavutil_fifo,
-  libavutil_file, libavutil_frame, libavutil_imgutils, libavutil_log,
-  libavutil_mathematics, libavutil_md5, libavutil_mem, libavutil_motion_vector,
-  libavutil_opt, libavutil_parseutils, libavutil_pixdesc, libavutil_pixfmt,
-  libavutil_rational, libavutil_samplefmt, libavutil_time, libavutil_timestamp,
-  libswresample, libswscale, sdl2, {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading;
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, System.DateUtils,
+  libavcodec, libavdevice, libavfilter, libswresample, libswscale,
+  libavutil, libavformat,
+  sdl2, {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading;
 
 type
   TVideoThread = class(TThread)
@@ -53,7 +45,7 @@ type
     Function Free3DCanvas:Boolean;
     Function CaslcSize(Sourse:TSDL_Rect):TSDL_Rect;
     Function SaveFrameAsJPEG(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer):Integer;
-    procedure RenderVideoFrame(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer; pix_fmt:TAVPixelFormat);
+    procedure RenderVideoFrame(w,h:SInt32;Data:Array of PByte;linesize: Array of Integer; pix_fmt:AVPixelFormat);
     Procedure GPEasyTextout(Graphics: TGPGraphics; Const TheText: String; Rect: TGPRectF; Color: TGPColor; HAlign, VAlign: TStringAlignment; Size: Integer = 10; FontName: String = 'Arial');
   public
     FBuffer:TMediaBuffer;
@@ -219,7 +211,7 @@ begin
            until (FAVPacked <> nil)or(Terminated)or(not Play);
            if FAVPacked <> nil then begin
             if FAVPacked.stream_index <> Self.FVideoStrem.index then begin
-             try av_packet_free(@FAVPacked);
+             try av_packet_free(FAVPacked);
              finally FAVPacked:=nil;
              end;
              Continue;
@@ -229,7 +221,7 @@ begin
           except
            av_frame_unref(FAVFrame);
            av_packet_unref(FAVPacked);
-           av_packet_free(@FAVPacked);
+           av_packet_free(FAVPacked);
            Continue;
           end;
           //Render := avcodec_decode_video2(FVideoStrem^.codec, FAVFrame, FGotFrame, FAVPacked) > 0;
@@ -275,7 +267,7 @@ begin
           end;
           if FAVFrame <> nil then av_frame_unref(FAVFrame);
           if FAVPacked <> nil then av_packet_unref(FAVPacked);
-          av_packet_free(@FAVPacked);
+          av_packet_free(FAVPacked);
         end;
       end;
      except
@@ -286,7 +278,7 @@ begin
        {$endif}
        if Assigned(FAVFrame) then av_frame_unref(FAVFrame);
        if Assigned(FAVPacked) then av_packet_unref(FAVPacked);
-       if Assigned(FAVPacked) then av_packet_free(@FAVPacked);
+       if Assigned(FAVPacked) then av_packet_free(FAVPacked);
 	     if Errorcount > 10 then Break;
 	     Inc(ErrorCount);
       end;
@@ -298,7 +290,7 @@ begin
      while Self.FBuffer.GetCount > 0 do begin
        FBuffer.ReadData(Pointer(FAVPacked));
        if Assigned(FAVPacked) then av_packet_unref(FAVPacked);
-       if Assigned(FAVPacked) then av_packet_free(@FAVPacked);
+       if Assigned(FAVPacked) then av_packet_free(FAVPacked);
      end;
      Self.FBuffer.FlushBuffer;
      FreeAndNil(Self.FBuffer);
@@ -306,8 +298,8 @@ begin
     {$Ifdef DEBUG}
     OutputDebugString(PChar('TVideoThread:'+IntToStr(Self.Tag)+' END'));
     {$endif}
-    if Assigned(FAVFrame) then av_frame_free(@FAVFrame);
-    if Assigned(FAVPacked) then av_packet_free(@FAVPacked);
+    if Assigned(FAVFrame) then av_frame_free(FAVFrame);
+    if Assigned(FAVPacked) then av_packet_free(FAVPacked);
     Dispose(FGotFrame);
   end;
 end;
@@ -332,7 +324,7 @@ procedure TVideoThread.FreeBuff(Sender: TObject; var Item: Pointer);
 //var AVPacked:PAVPacket;
 begin
   if Assigned(PAVPacket(Item)) then av_packet_unref(PAVPacket(Item));
-  if Assigned(PAVPacket(Item)) then av_packet_free(@PAVPacket(Item));
+  if Assigned(PAVPacket(Item)) then av_packet_free(PAVPacket(Item));
 end;
 
 procedure TVideoThread.GPEasyTextout(Graphics: TGPGraphics;
@@ -388,14 +380,14 @@ begin  Result:=True;
 end;
 
 procedure TVideoThread.RenderVideoFrame(w, h: SInt32; Data: array of PByte;
-  linesize: array of Integer; pix_fmt: TAVPixelFormat);
+  linesize: array of Integer; pix_fmt: AVPixelFormat);
 var
   res: SInt32;
   ImgConvContext: PSwsContext;
   Img: PAVFrame;
   Ibmp_Size: Integer;
   ibmp_Buff: PByte;
-  pix_F: TAVPixelFormat;
+  pix_F: AVPixelFormat;
   rect2, rect3: TSDL_Rect;
   p: Real;
 
@@ -486,7 +478,7 @@ begin
   //av_freep(ibmp_Buff);
   sws_freeContext(ImgConvContext);
   //av_frame_unref(@Img);
-  av_frame_free(@Img);
+  av_frame_free(Img);
   //Application.ProcessMessages;
   //SDL_RenderPresent(FSDLPantalla^.Renderer);
   //if Assigned(CS) then CS.Leave;

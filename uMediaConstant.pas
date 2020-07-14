@@ -10,18 +10,11 @@ uses
 
   Vcl.ExtCtrls,Math,System.SyncObjs,System.Generics.Collections,
 
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, FFTypes, FFUtils, System.DateUtils,
-  libavcodec, libavcodec_avfft, libavdevice, libavfilter, libavfilter_avcodec,
-  libavfilter_buffersink, libavfilter_buffersrc, libavfilter_formats,
-  libavformat, libavformat_avio, libavformat_url, libavutil,
-  libavutil_audio_fifo, libavutil_avstring, libavutil_bprint, libavutil_buffer,
-  libavutil_channel_layout, libavutil_common, libavutil_cpu, libavutil_dict,
-  libavutil_display, libavutil_error, libavutil_eval, libavutil_fifo,
-  libavutil_file, libavutil_frame, libavutil_imgutils, libavutil_log,
-  libavutil_mathematics, libavutil_md5, libavutil_mem, libavutil_motion_vector,
-  libavutil_opt, libavutil_parseutils, libavutil_pixdesc, libavutil_pixfmt,
-  libavutil_rational, libavutil_samplefmt, libavutil_time, libavutil_timestamp,
-  libswresample, libswscale, sdl2, {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading;
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, System.DateUtils,
+  libavcodec, libavdevice, libavfilter, libswresample, libswscale,
+  libavutil, libavformat,
+  sdl2,
+  {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading;
 
 
 const
@@ -46,7 +39,7 @@ type
   TOnReadPacked = Function (Sender:TObject;var Pack:PAVPacket):Integer of object;
   TOnReadVideoPacked = Function (Sender:TObject;var Pack:Pointer):Integer of object;
   //TOnReadAudioPacked = Function (Sender:TObject;var Pack:Pointer):Integer of object;
-  TOnRenderVideoFrame = procedure (w,h:SInt32;Data:Array of PByte;linesize: Array of Integer; pix_fmt:TAVPixelFormat) of object;
+  TOnRenderVideoFrame = procedure (w,h:SInt32;Data:Array of PByte;linesize: Array of Integer; pix_fmt:AVPixelFormat) of object;
   TOnIsPlayed = Procedure (Sender:TObject;var Play:Boolean)of object;
   TOnFlushBuffer = procedure (Sender:TObject; var Item:Pointer) of object;
 

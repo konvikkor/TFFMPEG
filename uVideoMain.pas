@@ -10,18 +10,10 @@ uses
 
   Vcl.ExtCtrls,Math,System.SyncObjs,System.Generics.Collections,
 
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, FFTypes, FFUtils, System.DateUtils,
-  libavcodec, libavcodec_avfft, libavdevice, libavfilter, libavfilter_avcodec,
-  libavfilter_buffersink, libavfilter_buffersrc, libavfilter_formats,
-  libavformat, libavformat_avio, libavformat_url, libavutil,
-  libavutil_audio_fifo, libavutil_avstring, libavutil_bprint, libavutil_buffer,
-  libavutil_channel_layout, libavutil_common, libavutil_cpu, libavutil_dict,
-  libavutil_display, libavutil_error, libavutil_eval, libavutil_fifo,
-  libavutil_file, libavutil_frame, libavutil_imgutils, libavutil_log,
-  libavutil_mathematics, libavutil_md5, libavutil_mem, libavutil_motion_vector,
-  libavutil_opt, libavutil_parseutils, libavutil_pixdesc, libavutil_pixfmt,
-  libavutil_rational, libavutil_samplefmt, libavutil_time, libavutil_timestamp,
-  libswresample, libswscale, sdl2, {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, System.DateUtils,
+  libavcodec, libavdevice, libavfilter, libswresample, libswscale,
+  libavutil, libavformat,
+  sdl2, {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading,
   uVideoThread;
 
 type
@@ -59,6 +51,7 @@ type
   published
     Property Display:TMediaDisplay Read FDisplay Write FDisplay;
     Property OnError:TOnError read FOnError Write FOnError;
+    function PPtrIdx(P: PPAVStream; I: integer): PAVStream;
   end;
 
   TMediaDecoder = class(TMediaCore)
@@ -133,7 +126,7 @@ begin
     end;
   end;}
   if Assigned(FAVFormatContext) then begin
-      avformat_close_input(@FAVFormatContext);
+      avformat_close_input(FAVFormatContext);
       FAVFormatContext := nil;
   end;
 end;
@@ -150,7 +143,7 @@ end;
 
 function TMediaCore.DecodeVideo: Integer;
 begin
-  Result := avcodec_decode_video2(FVideoStrem^.codec, FVideoFrame, FVideoGotFrame, FAVPacket);
+  Result := avcodec_decode_video2(FVideoStrem^.codec, FVideoFrame, FVideoGotFrame^, FAVPacket);
   if (Result < 0) then
   begin
     if Assigned(FOnError) then FOnError(Self,Result,'DecodeVideo : '+av_err2str(Result));
@@ -162,7 +155,7 @@ function TMediaCore.DecodeVideo(Sender:TObject;var Pack: PAVPacket; var Frame: P
 begin
  if Assigned(CS) then CS.Enter;
  try
-  Result := avcodec_decode_video2(FVideoStrem^.codec, Frame, Gotframe, Pack);
+  Result := avcodec_decode_video2(FVideoStrem^.codec, Frame, Gotframe^, Pack);
   if (Result < 0) then
   begin
     if Assigned(FOnError) then FOnError(Self,Result,'DecodeVideo : '+av_err2str(Result));
@@ -184,12 +177,13 @@ var i:Integer;
   opts: PAVDictionary;
   tmp:AnsiString;
   VideoFile:PAnsiChar;
-begin opts:=nil;
+  decoder_ret:pAVCodec;
+begin opts:=nil; decoder_ret:=nil;
  tmp:=AnsiString(FileName);
  VideoFile:=PAnsiChar(tmp);
  try
   { * open input file, and allocate format context * }
-  Result := avformat_open_input(@FAVFormatContext, VideoFile, nil, nil);
+  Result := avformat_open_input(FAVFormatContext, VideoFile, nil, nil);
   if Result < 0 then begin
     if Assigned(FOnError) then FOnError(self,Result,'Could not open source file "' + FileName+'" : '+av_err2str(Result));
     Exit;
@@ -203,7 +197,7 @@ begin opts:=nil;
   // Dump information about file onto standard error
   //av_dump_format(FormatContext, 0, VideoFile, 0);
   {* Поиск основного потока видео *}
-  Result := av_find_best_stream(FAVFormatContext, AVMEDIA_TYPE_VIDEO, -1, -1, nil, 0);
+  Result := av_find_best_stream(FAVFormatContext, AVMEDIA_TYPE_VIDEO, -1, -1, decoder_ret, 0);
   if Result < 0 then begin
     if Assigned(FOnError) then FOnError(self,result,'Error Message:Could not find ' +
       string(av_get_media_type_string(AVMEDIA_TYPE_VIDEO)) + ' stream in input file ''' +
@@ -245,6 +239,12 @@ begin opts:=nil;
  finally
   {* Освобождение и закрытие*}
  end;
+end;
+
+function TMediaCore.PPtrIdx(P: PPAVStream; I: integer): PAVStream;
+begin
+  Inc(P, I);
+  Result := P^;
 end;
 
 function TMediaCore.ReadPacked(Sender:TObject;var Pack: PAVPacket): Integer;
