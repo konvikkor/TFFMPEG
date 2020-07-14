@@ -183,10 +183,10 @@ begin
   //glLoadIdentity;
   //gluLookAt(0,0,5,0,0,0,0,0,1); //Позиция наблюдения
   glEnable(GL_DEPTH_TEST); // включаем проверку разрешения фигур (впереди стоящая закрывает фигуру за ней)
-  glEnable(GL_ALPHA_TEST); //разрешаем альфа-тест
-  glAlphaFunc(GL_GREATER,0.0);  // устанавливаем параметры
-  glEnable (GL_BLEND);     //Включаем режим смешивания цветов
-  glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) ; //параметры смешивания
+  //glEnable(GL_ALPHA_TEST); //разрешаем альфа-тест
+  //glAlphaFunc(GL_GREATER,0.0);  // устанавливаем параметры
+  //glEnable (GL_BLEND);     //Включаем режим смешивания цветов
+  //glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA) ; //параметры смешивания
   glDepthFunc(GL_LEQUAL); //тип проверки
   //glEnable(GL_ALPHA_TEST);
   //glShadeModel(GL_FLAT); //Режим без сглаживания
@@ -261,6 +261,19 @@ var
    texId:GLuint;
 begin
    GetObject(bmp.Handle, SizeOf(bmpInfo), @bmpInfo);
+   glPixelZoom(xZoom, yZoom);
+   glPushMatrix;
+   glLoadIdentity;
+   glRasterPos2i(x, y);
+   if bmpInfo.bmBitsPixel = 32 then
+     glDrawPixels(bmp.Width, bmp.Height, GL_BGRA_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits)
+   else
+     glDrawPixels(bmp.Width, bmp.Height, GL_BGR_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
+   glPopMatrix;
+   Result := Self;
+   exit;
+
+   GetObject(bmp.Handle, SizeOf(bmpInfo), @bmpInfo);
    res:=GetSizeProporcional(bmp.Width, bmp.Height);
    glPixelZoom(xZoom, yZoom);
    glPushMatrix;
@@ -280,21 +293,21 @@ begin
      //glDrawPixels(bmp.Width, bmp.Height, GL_BGR_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, bmp.Width, bmp.Height, 0, GL_RGB, GL_UNSIGNED_BYTE, Self.RenderBitmap.bmBits);
    end;
-   glGenTextures(1, @texId);
+   {glGenTextures(1, @texId);
    glBindTexture(GL_TEXTURE_2D, texId);        // Bind To The Texture ID
    //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
    glBegin(GL_QUADS);
-    {glNormal3f( 0.0, 0.0, 1.0);
+    (*glNormal3f( 0.0, 0.0, 1.0);
     glTexCoord2f(0.0, 0.0); glVertex3f(-1.0, -1.0,  1.0);
     glTexCoord2f(1.0, 0.0); glVertex3f( 1.0, -1.0,  1.0);
     glTexCoord2f(1.0, 1.0); glVertex3f( 1.0,  1.0,  1.0);
-    glTexCoord2f(0.0, 1.0); glVertex3f(-1.0,  1.0,  1.0);}
+    glTexCoord2f(0.0, 1.0); glVertex3f(-1.0,  1.0,  1.0);*)
     glNormal3f( 0.0, 0.0, 1.0);
     glTexCoord2f(0.0, 0.0); glVertex3f(-(res.X-5), -(res.Y-5),  1.0);
     glTexCoord2f(1.0, 0.0); glVertex3f( (res.X-5), -(res.Y-5),  1.0);
     glTexCoord2f(1.0, 1.0); glVertex3f( (res.X-5),  (res.Y-5),  1.0);
     glTexCoord2f(0.0, 1.0); glVertex3f(-(res.X-5),  (res.Y-5),  1.0);
-   glEnd;
+   glEnd;}
    glPopMatrix;
    Result := Self;
 end;

@@ -36,7 +36,7 @@ type
     LastVideoThreadRead:Integer;
     FVideoBuffer:TMediaBuffer;
   public
-    Constructor Create;
+    Constructor Create(AOwner: TComponent); override;
     Destructor Destroy; override;
     Function ReadPacked:Integer;overload;
     Function ReadPacked(var Pack:PAVPacket):Integer;overload;
@@ -70,7 +70,7 @@ type
     procedure OnIsPlayed(Sender:TObject;var Play:Boolean);
     procedure OnSyncTime(Sender:TObject;var GT:UInt64; Pack:PAVPacket; var Delay:Int64);
   public
-    constructor Create;
+    constructor Create(AOwner: TComponent); override;
     destructor Destroy;
     Function GetVideoStrem:PAVStream;
     function Start:Boolean;
@@ -125,14 +125,16 @@ begin
        Steams[i].stream.codec := nil;
     end;
   end;}
+  if not Assigned(self) then exit;
   if Assigned(FAVFormatContext) then begin
       avformat_close_input(FAVFormatContext);
       FAVFormatContext := nil;
   end;
 end;
 
-constructor TMediaCore.Create;
+constructor TMediaCore.Create(AOwner: TComponent);
 begin
+  inherited Create(AOwner);
   av_register_all();
   avcodec_register_all();
   FAVPacket:=av_packet_alloc;
@@ -349,13 +351,13 @@ end;
 
 { TMediaDecoder }
 
-constructor TMediaDecoder.Create;
+constructor TMediaDecoder.Create(AOwner: TComponent);
 begin
-  inherited;
+  inherited Create(AOwner);
   FVideoBuffer:=TMediaBuffer.Create();
-  Timer:=TTimer.Create(self);
-  Timer.Enabled:=False;
-  Timer.OnTimer:=OnTimer;
+  Self.Timer:=TTimer.Create(self);
+  Self.Timer.Enabled:=False;
+  Self.Timer.OnTimer:=OnTimer;
 end;
 
 destructor TMediaDecoder.Destroy;
@@ -453,11 +455,19 @@ function TMediaDecoder.Start: Boolean;
 var i:Integer;
 begin Result:=False;
   FPlay:=False;
+  if not Assigned(FVideoBuffer) then begin
+    FVideoBuffer:=TMediaBuffer.Create();
+  end;
   if not Assigned(FDisplay) then Exit;
   if Assigned(CS) then CS.Enter;
   try
    GlobalTime:=0;
-   Timer.Interval:=5;
+   if not Assigned(Self.Timer) then begin
+    Self.Timer:=TTimer.Create(self);
+    Self.Timer.Enabled:=False;
+    Self.Timer.OnTimer:=OnTimer;
+   end;
+   Self.Timer.Interval:=5;
    LastVideoThreadRead:=1;
    if NOT Assigned(FMediaReader) then begin
     FMediaReader:=TMediaReader.Create(Self);

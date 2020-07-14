@@ -38,6 +38,14 @@ object Form1: TForm1
     Height = 19
     Panels = <>
   end
+  object MediaDisplay1: TMediaDisplay
+    Left = 0
+    Top = 0
+    Width = 635
+    Height = 396
+    PopupMenu = PopupMenu1
+    Align = alClient
+  end
   object PopupMenu1: TPopupMenu
     Left = 248
     Top = 152
@@ -66,5 +74,10 @@ object Form1: TForm1
   object OpenDialog1: TOpenDialog
     Left = 128
     Top = 72
+  end
+  object MediaDecoder1: TMediaDecoder
+    Display = MediaDisplay1
+    Left = 160
+    Top = 184
   end
 end

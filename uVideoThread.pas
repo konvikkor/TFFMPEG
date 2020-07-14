@@ -98,8 +98,7 @@ implementation
 { TVideoThread }
 
 function TVideoThread.CaslcSize(Sourse: TSDL_Rect): TSDL_Rect;
-var rect:TSDL_Rect;
-    pw,ph,p:Double;
+var p:Double;
 begin
   //if not Assigned(FSDLPantalla.Renderer) then Exit;
   //SDL_RenderGetViewport(FSDLPantalla.Renderer,@rect);
@@ -134,7 +133,7 @@ var Play:Boolean;
   Decoded,Render:Boolean;
   tic1, tic2:UInt64;
   Delay,Delay2:Int64;
-  Last_Delay:Int64;
+  //Last_Delay:Int64;
   ErrorCount:Int64;
 
   function isTimePak:Boolean;
@@ -155,7 +154,7 @@ var Play:Boolean;
    Result:= GT >= tmp
   end;
 
-  function isTimeFail:boolean;
+  (*function isTimeFail:boolean;
   var tmp:Int64;tmp1:Int64;
     tic1, tic2:Int64;
   begin Result:=True;
@@ -172,7 +171,7 @@ var Play:Boolean;
    else tmp1:=0;
    tic2:=GetTickCount;
    Result:= GT - tmp > tmp1 {500};//((GT div 1000)+tmp1-(tic2 - tic1)) >= tmp
-  end;
+  end;*)
 
 begin
   NameThreadForDebugging('TVideoThread:'+IntToStr(Self.Tag));
@@ -381,46 +380,40 @@ end;
 
 procedure TVideoThread.RenderVideoFrame(w, h: SInt32; Data: array of PByte;
   linesize: array of Integer; pix_fmt: AVPixelFormat);
-var
-  res: SInt32;
-  ImgConvContext: PSwsContext;
-  Img: PAVFrame;
-  Ibmp_Size: Integer;
-  ibmp_Buff: PByte;
-  pix_F: AVPixelFormat;
-  rect2, rect3: TSDL_Rect;
-  p: Real;
-
-  TicB,TicE:Cardinal;
-
-  //MyRect:TRect;
-
-  rect: TSDL_Rect;
+var res: SInt32;
+    ImgConvContext: pSwsContext;
+    Img: PAVFrame;
+    Ibmp_Size: Integer;
+    ibmp_Buff: PByte;
+    pix_F: AVPixelFormat;
+    rect2{, rect3}: TSDL_Rect;
+    //p: Real;
+    //TicB,TicE:Cardinal;
+    //MyRect:TRect;
+    rect: TSDL_Rect;
 begin
- //if Assigned(CS) then CS.Enter;
- //if not Assigned(FSDLPantalla.Window) then Exit;
  try
-  pix_F := AV_PIX_FMT_BGR0;{WORK}
+  pix_F := AV_PIX_FMT_BGRA;//AV_PIX_FMT_BGR0;{WORK}
   // Задаём размеры прямоугольника в дальнейшем по мену будем считать преобразование размера кадра
   rect.x := 0; rect.y := 0;
   //MyRect:=GetClientRect;
   rect.w := w; // шырена
   rect.h := h; // высота
   rect2:=CaslcSize(rect);
-  //Ini3DCanvas(rect2{rect});
-  // проверяем была ли инициализация
-  (*if {(not assigned(FSDLPantalla.Window.surface)) OR }(not assigned(MooseTexture)) then begin
-    Exit;
-  end;*)
   // Очистка от предыдущий ошибок
-  Img := av_frame_alloc(); // Создаём пространство для конвертированного кадра
   // получаем контекст для преобразования в RGBы
   ImgConvContext := nil;
+  (* Вот тут вылетает *)
   ImgConvContext := sws_getContext(w, h, pix_fmt, rect2.W, rect2.h, pix_F, SWS_BILINEAR, nil, nil, nil);
+  if (ImgConvContext = nil) then
+  begin
+     raise Exception.Create('Error Message ImgConvContext = nil');
+  end;
   // Формируем буфер для картинки RGB
   Ibmp_Size := avpicture_get_size(pix_F, rect2.w, rect2.H);
   ibmp_Buff := nil;
   ibmp_Buff := av_malloc(Ibmp_Size * SizeOf(Byte));
+  Img := av_frame_alloc(); // Создаём пространство для конвертированного кадра
   res := avpicture_fill(PAVPicture(Img), ibmp_Buff, pix_F, rect2.w,rect2.h);
   // конвертируем формат пикселя в RGB
   if Assigned(ImgConvContext) then res := sws_scale(ImgConvContext, @Data, @linesize, 0, h, @Img.Data, @Img.linesize);
@@ -468,8 +461,9 @@ begin
     //if AVStream.avg_frame_rate.den > 0 then res:=Trunc(av_q2d(AVStream.avg_frame_rate))-((TicE-TicB)+DeleyTime);
   except
     on E: Exception do begin
-     //Free3DCanvas;
+      //Free3DCanvas;
       //Result := False;
+      //Exception.RaiseOuterException(e);
     end;
   end;
  finally
@@ -490,16 +484,16 @@ var
   BMPFile:TMemoryStream;//TFileStream;
   BMPHeader:BITMAPFILEHEADER;
   BMPInfo:TBitmapV4Header;
-  ret:Integer;
+  //ret:Integer;
 
   bmp:TBitmap;
   Graphics : TGPGraphics;
-  Img:TGPBitmap;
-  Text:string;
+  //Img:TGPBitmap;
+  //Text:string;
 
-  TextureID:LongInt;
-  Buffer:BITMAP;
-  res: Integer;
+  //TextureID:LongInt;
+  //Buffer:BITMAP;
+  //res: Integer;
 
   LineByte:TArray<TArray<Byte>>;
   I: Integer;
@@ -510,7 +504,8 @@ begin Result:=0;
   bmpheader.bfReserved2 := 0;
   bmpheader.bfType := $4d42;
   bmpheader.bfOffBits := sizeof(BITMAPFILEHEADER) + sizeof(BITMAPV4HEADER);
-  bmpheader.bfSize := bmpheader.bfOffBits + w*h*32 div 8;
+  bmpheader.bfSize := bmpheader.bfOffBits + w*h*32 div 8; //32
+  //bmpheader.bfSize := bmpheader.bfOffBits + w*h*24 div 8; //24
 
   bmpinfo.bV4Size := sizeof(BITMAPV4HEADER);
   bmpinfo.bV4Width := w;
@@ -523,10 +518,10 @@ begin Result:=0;
   bmpinfo.bV4YPelsPerMeter := 2835; //ResolutionVertical
   bmpinfo.bV4ClrUsed := 0;
   bmpinfo.bV4ClrImportant := 0;
-  BMPInfo.bV4RedMask:=  $00FF0000;{WORK}
-  BMPInfo.bV4GreenMask:=$0000FF00;
-  BMPInfo.bV4BlueMask:= $000000FF;{WORK}
-  BMPInfo.bV4AlphaMask:=$FF000000;
+  BMPInfo.bV4RedMask:=  $FF000000;//$00FF0000;{WORK}
+  BMPInfo.bV4GreenMask:=$00FF0000;//$0000FF00;
+  BMPInfo.bV4BlueMask:= $0000FF00;//$000000FF;{WORK}
+  BMPInfo.bV4AlphaMask:=$000000FF;//$FF000000;
   BMPInfo.bV4CSType:=$206E6957;
   BMPInfo.bV4GammaRed:=0;
   BMPInfo.bV4GammaGreen:=0;
@@ -550,6 +545,13 @@ begin Result:=0;
     for I := High(LineByte) downto 0 do begin
       BMPFile.WriteData(LineByte[i],w*32 div 8);
     end;
+    (*for I := 0 to h-1 do begin
+      SetLength(LineByte[i],w*24 div 8);
+      CopyMemory(LineByte[i],data[0]+((w*24 div 8)*i),w*24 div 8);
+    end;
+    for I := High(LineByte) downto 0 do begin
+      BMPFile.WriteData(LineByte[i],w*24 div 8);
+    end;*)
     //BMPFile.WriteBuffer(data[0]^,w*h*32 div 8);
     BMPFile.Position:=0;
     BMP.LoadFromStream(BMPFile);

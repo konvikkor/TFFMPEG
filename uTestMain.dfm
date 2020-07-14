@@ -12,7 +12,6 @@ object Form1: TForm1
   Font.Style = []
   OldCreateOrder = False
   PopupMenu = PopupMenu1
-  OnCreate = FormCreate
   PixelsPerInch = 96
   TextHeight = 13
   object PageControl1: TPageControl
@@ -79,6 +78,8 @@ object Form1: TForm1
     object TabSheet2: TTabSheet
       Caption = 'VideoCaplion'
       ImageIndex = 1
+      ExplicitLeft = 8
+      ExplicitTop = 22
       object TrackBar1: TTrackBar
         Left = 0
         Top = 320
@@ -96,6 +97,17 @@ object Form1: TForm1
         TabOrder = 0
         TickMarks = tmBoth
         TickStyle = tsNone
+      end
+      object MediaDisplay: TMediaDisplay
+        Left = 0
+        Top = 0
+        Width = 582
+        Height = 320
+        Align = alClient
+        ExplicitLeft = 72
+        ExplicitTop = 136
+        ExplicitWidth = 200
+        ExplicitHeight = 200
       end
     end
     object TabSheet3: TTabSheet
@@ -137,7 +149,6 @@ object Form1: TForm1
     end
     object DecodePak1: TMenuItem
       Caption = 'Decode Pak'
-      OnClick = DecodePak1Click
     end
     object Play1: TMenuItem
       Caption = 'Play'
@@ -156,11 +167,6 @@ object Form1: TForm1
     Left = 176
     Top = 48
   end
-  object Timer1: TTimer
-    OnTimer = Timer1Timer
-    Left = 132
-    Top = 40
-  end
   object TrayIcon1: TTrayIcon
     PopupMenu = PopupMenu1
     Visible = True
@@ -176,5 +182,10 @@ object Form1: TForm1
   object OpenDialog2: TOpenDialog
     Left = 156
     Top = 160
+  end
+  object Media: TMediaDecoder
+    Display = MediaDisplay
+    Left = 316
+    Top = 72
   end
 end

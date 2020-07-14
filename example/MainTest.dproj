@@ -89,58 +89,6 @@
             <Form>Form1</Form>
             <FormType>dfm</FormType>
         </DCCReference>
-        <DCCReference Include="..\uFFMPG.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\FFTypes.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavcodec.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavcodec_avfft.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavdevice.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavfilter.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavfilter_avcodec.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavfilter_buffersink.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavfilter_buffersrc.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavfilter_formats.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavformat.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavformat_avio.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavformat_url.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_audio_fifo.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_avstring.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_bprint.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_buffer.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_channel_layout.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_common.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_cpu.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_dict.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_display.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_error.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_eval.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_fifo.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_file.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_frame.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_hwcontext.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_imgutils.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_log.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_mathematics.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_md5.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_mem.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_motion_vector.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_opt.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_parseutils.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_pixdesc.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_pixfmt.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_rational.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_samplefmt.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_time.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libavutil_timestamp.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libswresample.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\libswscale.pas"/>
-        <DCCReference Include="..\SDL_Header\sdl2.pas"/>
-        <DCCReference Include="..\SDL_Header\sdl2_gfx.pas"/>
-        <DCCReference Include="..\SDL_Header\sdl2_image.pas"/>
-        <DCCReference Include="..\SDL_Header\sdl2_mixer.pas"/>
-        <DCCReference Include="..\SDL_Header\sdl2_net.pas"/>
-        <DCCReference Include="..\SDL_Header\sdl2_ttf.pas"/>
-        <DCCReference Include="..\FFMpeg_Header\FFUtils.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
