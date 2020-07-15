@@ -67,7 +67,7 @@ type
     function DrawBitmapTex(bmp: TBitmap; x, y, w, h: Integer): TMediaDisplay; overload;
     Procedure BeginRender;
     Procedure UpdateRender;
-    Procedure SetBitmap(BMP:TBitmap;GlobalTime,PackTime:Cardinal);
+    Procedure SetBitmap(BMP:TBitmap;GlobalTime:Cardinal = 0;PackTime:Cardinal = 0);
     function TextOut(const text: WideString; x, y: Integer; red, green, blue, alpha: Single): TMediaDisplay;
     Procedure EndRender;
     function Bitmap2PixelArray(Source:TBitmap):BITMAP;
@@ -260,7 +260,7 @@ var
    res:TPoint;
    texId:GLuint;
 begin
-   GetObject(bmp.Handle, SizeOf(bmpInfo), @bmpInfo);
+   (*GetObject(bmp.Handle, SizeOf(bmpInfo), @bmpInfo);
    glPixelZoom(xZoom, yZoom);
    glPushMatrix;
    glLoadIdentity;
@@ -271,44 +271,33 @@ begin
      glDrawPixels(bmp.Width, bmp.Height, GL_BGR_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
    glPopMatrix;
    Result := Self;
-   exit;
+   exit;*)
 
-   GetObject(bmp.Handle, SizeOf(bmpInfo), @bmpInfo);
-   res:=GetSizeProporcional(bmp.Width, bmp.Height);
-   glPixelZoom(xZoom, yZoom);
-   glPushMatrix;
-   glLoadIdentity;
-   glRasterPos2i(x, y);
    Self.RenderBMP.Assign(bmp);
    Self.RenderBMP.Dormant;
    Self.RenderBitmap:=Bitmap2PixelArray(Self.RenderBMP);
-   glPixelStorei(GL_PACK_ALIGNMENT, 1);
+   res:=GetSizeProporcional(Self.RenderBitmap.bmWidth, Self.RenderBitmap.bmHeight);
+   glGenTextures(1, @texId); //генерим текстуру
+   glBindTexture(GL_TEXTURE_2D, texId);
    // Typical Texture Generation Using Data From The Bitmap
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); // Linear Min Filter
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); // Linear Mag Filter
-   if bmpInfo.bmBitsPixel = 32 then begin
-     //glDrawPixels(bmp.Width, bmp.Height, GL_BGRA_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits)
-     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, bmp.Width, bmp.Height, 0, GL_RGB, GL_UNSIGNED_BYTE, Self.RenderBitmap.bmBits);
+   if Self.RenderBitmap.bmBitsPixel = 32 then begin
+     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, bmp.Width, bmp.Height, 0, GL_BGRA_EXT, GL_UNSIGNED_BYTE, Self.RenderBitmap.bmBits);
    end else begin
-     //glDrawPixels(bmp.Width, bmp.Height, GL_BGR_EXT, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
-     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, bmp.Width, bmp.Height, 0, GL_RGB, GL_UNSIGNED_BYTE, Self.RenderBitmap.bmBits);
+     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, bmp.Width, bmp.Height, 0, GL_BGR_EXT, GL_UNSIGNED_BYTE, Self.RenderBitmap.bmBits);
    end;
-   {glGenTextures(1, @texId);
-   glBindTexture(GL_TEXTURE_2D, texId);        // Bind To The Texture ID
-   //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+   glPushMatrix;
    glBegin(GL_QUADS);
-    (*glNormal3f( 0.0, 0.0, 1.0);
-    glTexCoord2f(0.0, 0.0); glVertex3f(-1.0, -1.0,  1.0);
-    glTexCoord2f(1.0, 0.0); glVertex3f( 1.0, -1.0,  1.0);
-    glTexCoord2f(1.0, 1.0); glVertex3f( 1.0,  1.0,  1.0);
-    glTexCoord2f(0.0, 1.0); glVertex3f(-1.0,  1.0,  1.0);*)
     glNormal3f( 0.0, 0.0, 1.0);
-    glTexCoord2f(0.0, 0.0); glVertex3f(-(res.X-5), -(res.Y-5),  1.0);
-    glTexCoord2f(1.0, 0.0); glVertex3f( (res.X-5), -(res.Y-5),  1.0);
-    glTexCoord2f(1.0, 1.0); glVertex3f( (res.X-5),  (res.Y-5),  1.0);
-    glTexCoord2f(0.0, 1.0); glVertex3f(-(res.X-5),  (res.Y-5),  1.0);
-   glEnd;}
+    glTexCoord2f(0.0, 0.0); glVertex3f(-((res.X div 2)-0), -((res.Y div 2)-0),  0.0);
+    glTexCoord2f(1.0, 0.0); glVertex3f( ((res.X div 2)-0), -((res.Y div 2)-0),  0.0);
+    glTexCoord2f(1.0, 1.0); glVertex3f( ((res.X div 2)-0),  ((res.Y div 2)-0),  0.0);
+    glTexCoord2f(0.0, 1.0); glVertex3f(-((res.X div 2)-0),  ((res.Y div 2)-0),  0.0);
+   glEnd;
    glPopMatrix;
+   glBindTexture(GL_TEXTURE_2D, 0);
+   glDeleteTextures(1,@texId);
    Result := Self;
 end;
 
@@ -465,6 +454,7 @@ begin
   //glRotatef(угол, x, y, z) где x, y, z – координаты оси поворота
   (* Освещение *)
   glEnable(GL_LIGHT0); //включаем источник света №0
+  UpdateRender;
 
   (*
     glpushMatrix; //Запомнили
@@ -698,13 +688,6 @@ begin x:=0; y:=0; Texture:=0;
 
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity;
-  FPS:=Round(TTimeSpan.Subtract(GetTime,Self.CalcFPS).Milliseconds);
-  Self.CalcFPS:=GetTime;
-  TextOut('Media Display ['+FormatDateTime('hh.mm.ss.zzz',Time)+'] FPS:'+FloatToStr(FPS),-ClientWidth div 2 + 5,ClientHeight div 2 - 15,-128,11,0,0);
-  if FDrawInfo then begin
-    TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,GlobalTime))+'] Global',-ClientWidth div 2 + 5,ClientHeight div 2 - 30,1,0,1,0);
-    TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,PackTime))+'] Packed',-ClientWidth div 2 + 5,ClientHeight div 2 - 45,1,1,0,0);
-  end;
   if Assigned(RenderBMP) then begin
     BeginRender;
     try
@@ -713,39 +696,17 @@ begin x:=0; y:=0; Texture:=0;
       x:=-RenderBMP.Width div 2;
       y:=-RenderBMP.Height div 2;
       DrawBitmap(RenderBMP,x,y);
-      {x:=RenderBMP.Width;
-      y:=RenderBMP.Height;
-      glColor3f(0.7,0.7,0.7);
-      glEnable(GL_TEXTURE_2D);
-      glDisable(GL_TEXTURE_2D);
-      glGenTextures(1,@Texture);
-      glBindTexture(GL_TEXTURE_2D,Texture);
-      GetObject(RenderBMP.Handle, SizeOf(bmpInfo), @bmpInfo);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-      glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_BLEND);
-      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0,GL_RGBA, GL_UNSIGNED_BYTE, bmpInfo.bmBits);
-      glBegin(GL_QUADS);
-        glTexCoord2f(0, 0);
-        glVertex3f(-x/2, -y/2, 0);
-        glTexCoord2f(1, 0);
-        glVertex3f(x/2, -y/2, 0);
-        glTexCoord2f(1, 1);
-        glVertex3f(x/2, y/2, 0);
-        glTexCoord2f(0, 1);
-        glVertex3f(-x/2, y/2, 0);
-      glEnd;}
-      //DrawBitmapTex(RenderBMP,-x div 2,-y div 2,x,y);
-      //gluLookAt(0,0,-10,0,0,0,0,0,0);
-      (* Draw IMG < *)
-      (*BuildTexture(RenderBMP,Texture);
-      DrawBitmapTex(Texture,-x div 2,-y div 2,x,y);
-      DeleteTexture(Texture);*)
      end;
     finally
       EndRender;
     end;
+  end;
+  FPS:=Round(TTimeSpan.Subtract(GetTime,Self.CalcFPS).Milliseconds);
+  Self.CalcFPS:=GetTime;
+  TextOut('Media Display ['+FormatDateTime('hh.mm.ss.zzz',Time)+'] FPS:'+FloatToStr(FPS),-ClientWidth div 2 + 5,ClientHeight div 2 - 15,-128,11,0,0);
+  if FDrawInfo then begin
+    TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,GlobalTime))+'] Global',-ClientWidth div 2 + 5,ClientHeight div 2 - 30,1,0,1,0);
+    TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,PackTime))+'] Packed',-ClientWidth div 2 + 5,ClientHeight div 2 - 45,1,1,0,0);
   end;
   //SwapBuffers(wglGetCurrentDC);
   //glFlush;

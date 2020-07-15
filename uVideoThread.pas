@@ -404,17 +404,20 @@ begin
   // получаем контекст для преобразования в RGBы
   ImgConvContext := nil;
   (* Вот тут вылетает *)
-  ImgConvContext := sws_getContext(w, h, pix_fmt, rect2.W, rect2.h, pix_F, SWS_BILINEAR, nil, nil, nil);
+  ImgConvContext := sws_getContext(w, h, pix_fmt, rect2.W, rect2.h, pix_F, SWS_BILINEAR, nil, nil, nil); //Resize
+  //ImgConvContext := sws_getContext(w, h, pix_fmt, w, h, pix_F, SWS_BILINEAR, nil, nil, nil);  //no resize
   if (ImgConvContext = nil) then
   begin
      raise Exception.Create('Error Message ImgConvContext = nil');
   end;
   // Формируем буфер для картинки RGB
-  Ibmp_Size := avpicture_get_size(pix_F, rect2.w, rect2.H);
+  Ibmp_Size := avpicture_get_size(pix_F, rect2.w, rect2.H); //resize
+  //Ibmp_Size := avpicture_get_size(pix_F, w, h); // no resize
   ibmp_Buff := nil;
   ibmp_Buff := av_malloc(Ibmp_Size * SizeOf(Byte));
   Img := av_frame_alloc(); // Создаём пространство для конвертированного кадра
-  res := avpicture_fill(PAVPicture(Img), ibmp_Buff, pix_F, rect2.w,rect2.h);
+  res := avpicture_fill(PAVPicture(Img), ibmp_Buff, pix_F, rect2.w,rect2.h); // resize
+  //res := avpicture_fill(PAVPicture(Img), ibmp_Buff, pix_F, w, h); //no resize
   // конвертируем формат пикселя в RGB
   if Assigned(ImgConvContext) then res := sws_scale(ImgConvContext, @Data, @linesize, 0, h, @Img.Data, @Img.linesize);
   try
@@ -422,7 +425,8 @@ begin
     //Ini3DCanvas(rect2);
     if FAVFrame.pict_type <> AV_PICTURE_TYPE_NONE then begin
      //Self.FMediaDisplay.Render(rect2.w, rect2.H,Img.Data[0], Img.linesize[0]);
-     SaveFrameAsJPEG(rect2.w, rect2.H,Img.Data[0], Img.linesize[0]);
+     SaveFrameAsJPEG(rect2.w, rect2.H,Img.Data[0], Img.linesize[0]); //Resize
+     //SaveFrameAsJPEG(w, h,Img.Data[0], Img.linesize[0]); //no resize
      (*Ini3DCanvas(rect2);
      try
      res := SDL_UpdateTexture(MooseTexture, @rect2, @Img.Data[0]^, Img.linesize[0]);
