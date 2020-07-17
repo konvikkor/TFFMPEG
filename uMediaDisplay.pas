@@ -12,7 +12,7 @@ uses
 
   Vcl.ExtCtrls,Math,System.SyncObjs,System.Generics.Collections,
 
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, System.DateUtils,
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, System.DateUtils, mmsystem,
   libavcodec, libavdevice, libavfilter, libswresample, libswscale,
   libavutil, libavformat,
   sdl2, {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading;
@@ -21,6 +21,8 @@ uses
   //GL_BGR = $80E0;
 
 type
+  TOnBeforeRender = procedure (Sender:TObject) of object;
+  TOnAfterRender = procedure (Sender:TObject) of object;
   TMediaDisplay = class (TCustomPanel)
   private
     FSDLPantalla: PSDLPantalla;
@@ -35,7 +37,13 @@ type
     FASCIICharList: GLuint;
     GlobalTime,PackTime:Cardinal;
     FDrawInfo: Boolean;
+    (* FPS *)
     CalcFPS:Double;
+    LastTime: Double;
+    framesPerSecond : Double;
+    FOnBeforeRender: TOnBeforeRender;
+    FOnAfterRender: TOnAfterRender;
+    procedure CalculateFrameRate();
   protected
     RenderBitmap:BITMAP;
     procedure Paint; override;
@@ -83,6 +91,8 @@ type
     property OnKeyUp;
     property OnKeyPress;
     property OnKeyDown;
+    property OnBeforeRender:TOnBeforeRender Read FOnBeforeRender Write FOnBeforeRender;
+    property OnAfterRender:TOnAfterRender Read FOnAfterRender Write FOnAfterRender;
     property Align;
   end;
 
@@ -151,6 +161,19 @@ begin
    //glGenerateMipmap(GL_TEXTURE_2D);
    (* TEST < *)
    Result := Self;
+end;
+
+procedure TMediaDisplay.CalculateFrameRate;
+var currentTime:Double;
+begin
+  currentTime:= GetTickCount{(TimeGetTime)} * 0.001;
+  framesPerSecond:=framesPerSecond+1.0;
+  if (currentTime - LastTime) > 1.0 then begin
+    LastTime:=currentTime;
+    Self.CalcFPS:=framesPerSecond;
+    framesPerSecond:=0;
+  end;
+
 end;
 
 constructor TMediaDisplay.Create(AOwner: TComponent);
@@ -437,16 +460,19 @@ var Rect: TRect;
   Text:string;
 begin
   //glClearColor (0.5, 0.5, 0.75, 1.0); //÷вет фона
+
   glClearColor (0, 0, 0, 1.0); //÷вет фона
   glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //ќчистка буфера цвета и глубины
   glLoadIdentity; //—брасываем текущую матрицу
   glViewport(0,0,ClientWidth,ClientHeight); // размеры экрана что будем показывать
   glMatrixMode(GL_PROJECTION); //переходим в матрицу проекции
   glLoadIdentity; //—брасываем текущую матрицу
-  glOrtho(-ClientWidth div 2,ClientWidth div 2,-ClientHeight div 2,ClientHeight div 2,-800,800);   //центровка в ноль по центру экрана*)
-  //gluOrtho2D(-ClientWidth div 2,ClientWidth div 2,-ClientHeight div 2,ClientHeight div 2);   //центровка в ноль по центру экрана*)
+  glOrtho(-ClientWidth div 2,ClientWidth div 2,-ClientHeight div 2,ClientHeight div 2,-800,800);   //центровка в ноль по центру экрана
   glMatrixMode(GL_MODELVIEW);  // переходим в модельную матрицу
   glLoadIdentity; //—брасываем текущую матрицу
+
+
+  //gluOrtho2D(-ClientWidth div 2,ClientWidth div 2,-ClientHeight div 2,ClientHeight div 2);   //центровка в ноль по центру экрана*)
   //gluLookAt(5,5,5,0,0,0,0,0,1); //позици€ наблюдател€
   (* ѕеремещение *)
   //glTranslatef(x, y, z) где x, y, z Цвектор смещени€ всей системы координат. сдвинем в сторону.
@@ -476,7 +502,7 @@ begin
     glVertex2i(ClientWidth,0);
   glEnd;*)
   (* Test OpenGL < *)
-  SwapBuffers(wglGetCurrentDC); //---------------------------
+  //SwapBuffers(wglGetCurrentDC); //---------------------------
  (*Canvas.Lock;
  try
   (* Message Pain frame *
@@ -686,6 +712,10 @@ begin x:=0; y:=0; Texture:=0;
   //glColor3f(1.0,0.0,0.0);
   glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //ќчистка буфера цвета и глубины
 
+  if Assigned(FOnBeforeRender) then begin
+    FOnBeforeRender(self);
+  end;
+
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity;
   if Assigned(RenderBMP) then begin
@@ -701,9 +731,10 @@ begin x:=0; y:=0; Texture:=0;
       EndRender;
     end;
   end;
-  FPS:=Round(TTimeSpan.Subtract(GetTime,Self.CalcFPS).Milliseconds);
-  Self.CalcFPS:=GetTime;
-  TextOut('Media Display ['+FormatDateTime('hh.mm.ss.zzz',Time)+'] FPS:'+FloatToStr(FPS),-ClientWidth div 2 + 5,ClientHeight div 2 - 15,-128,11,0,0);
+  //FPS:=Round(TTimeSpan.Subtract(GetTime,Self.CalcFPS).Milliseconds);
+  //Self.CalcFPS:=GetTime;
+  Self.CalculateFrameRate;
+  TextOut('Media Display ['+FormatDateTime('hh.mm.ss.zzz',Time)+'] FPS:'+FloatToStr(Self.CalcFPS{FPS}),-ClientWidth div 2 + 5,ClientHeight div 2 - 15,-128,11,0,0);
   if FDrawInfo then begin
     TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,GlobalTime))+'] Global',-ClientWidth div 2 + 5,ClientHeight div 2 - 30,1,0,1,0);
     TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,PackTime))+'] Packed',-ClientWidth div 2 + 5,ClientHeight div 2 - 45,1,1,0,0);
@@ -711,6 +742,9 @@ begin x:=0; y:=0; Texture:=0;
   //SwapBuffers(wglGetCurrentDC);
   //glFlush;
   //Application.ProcessMessages;
+  if Assigned(FOnAfterRender) then begin
+    FOnAfterRender(self);
+  end;
   SwapBuffers(HDC);
 end;
 
