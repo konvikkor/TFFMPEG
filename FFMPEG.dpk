@@ -38,6 +38,7 @@ contains
   uMediaDisplay in 'uMediaDisplay.pas',
   uMediaReader in 'uMediaReader.pas',
   uVideoMain in 'uVideoMain.pas',
-  uVideoThread in 'uVideoThread.pas';
+  uVideoThread in 'uVideoThread.pas',
+  u3DCamera in 'u3DCamera.pas';
 
 end.
