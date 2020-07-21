@@ -15,7 +15,7 @@ uses
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, System.DateUtils, mmsystem,
   libavcodec, libavdevice, libavfilter, libswresample, libswscale,
   libavutil, libavformat,
-  sdl2, {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading;
+  sdl2, {SDL2_ttf,{sdl, {uResourcePaths,} System.Threading, u3DCamera;
 
 //const
   //GL_BGR = $80E0;
@@ -43,6 +43,7 @@ type
     framesPerSecond : Double;
     FOnBeforeRender: TOnBeforeRender;
     FOnAfterRender: TOnAfterRender;
+    FCamera: T3DCamera;
     procedure CalculateFrameRate();
   protected
     RenderBitmap:BITMAP;
@@ -81,6 +82,7 @@ type
     function Bitmap2PixelArray(Source:TBitmap):BITMAP;
   published
     //Property AutoInitSDL:Boolean Read FAutoInitSDL Write FAutoInitSDL default true;
+    property Camera:T3DCamera Read FCamera Write FCamera;
     Property DrawInfo:Boolean Read FDrawInfo Write FDrawInfo default false;
     property Anchors;
     property OnContextPopup;
@@ -711,6 +713,11 @@ var  x,y:Integer;
 begin x:=0; y:=0; Texture:=0;
   //glColor3f(1.0,0.0,0.0);
   glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //Очистка буфера цвета и глубины
+
+  if Assigned(FCamera) then begin
+    SendMessage(FCamera,WM_3D_CAMERA_RENDER,nil,nil);
+    PostMessage(FCamera.Handle,WM_3D_CAMERA_RENDER,0,0);
+  end;
 
   if Assigned(FOnBeforeRender) then begin
     FOnBeforeRender(self);
