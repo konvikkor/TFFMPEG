@@ -20,7 +20,6 @@ uses
 const
 
   WM_PAINT_FRAME = WM_USER + 0;
-  WM_3D_CAMERA_RENDER = WM_USER + 1;
 
   MAX_AUDIO_FRAME_SIZE = 192000; // 1 second of 48khz 32bit audio
   MODULE_VERSION = '2.0';
@@ -44,9 +43,11 @@ type
   TOnIsPlayed = Procedure (Sender:TObject;var Play:Boolean)of object;
   TOnFlushBuffer = procedure (Sender:TObject; var Item:Pointer) of object;
 
-  T3DPoint = packed record
-    x, y, z:GLfloat;
+  TPoint3D = packed record
+    x, y, z:float;
+    function SetXYZ(x,y,z:Float):TPoint3D;
   end;
+
   TMediaBufferInfo = packed Record
     AVStream  : PAVStream;
     AVPacket  : PAVPacket;//TAVPacket;
@@ -162,5 +163,15 @@ begin
   end;
 end;
 
+
+{ TPoint3D }
+
+function TPoint3D.SetXYZ(x, y, z: Float): TPoint3D;
+begin
+  Self.x:=x;
+  Self.y:=y;
+  Self.z:=z;
+  Result:= Self;
+end;
 
 end.

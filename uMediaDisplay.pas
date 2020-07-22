@@ -43,7 +43,7 @@ type
     framesPerSecond : Double;
     FOnBeforeRender: TOnBeforeRender;
     FOnAfterRender: TOnAfterRender;
-    FCamera: T3DCamera;
+    FCamera: TCamera3D;
     procedure CalculateFrameRate();
   protected
     RenderBitmap:BITMAP;
@@ -82,7 +82,7 @@ type
     function Bitmap2PixelArray(Source:TBitmap):BITMAP;
   published
     //Property AutoInitSDL:Boolean Read FAutoInitSDL Write FAutoInitSDL default true;
-    property Camera:T3DCamera Read FCamera Write FCamera;
+    property Camera:TCamera3D Read FCamera Write FCamera;
     Property DrawInfo:Boolean Read FDrawInfo Write FDrawInfo default false;
     property Anchors;
     property OnContextPopup;
@@ -463,15 +463,17 @@ var Rect: TRect;
 begin
   //glClearColor (0.5, 0.5, 0.75, 1.0); //÷вет фона
 
-  glClearColor (0, 0, 0, 1.0); //÷вет фона
+  {glClearColor (0, 0, 0, 1.0); //÷вет фона
   glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //ќчистка буфера цвета и глубины
   glLoadIdentity; //—брасываем текущую матрицу
-  glViewport(0,0,ClientWidth,ClientHeight); // размеры экрана что будем показывать
+  }
+  (*glViewport(0,0,ClientWidth,ClientHeight); // размеры экрана что будем показывать
   glMatrixMode(GL_PROJECTION); //переходим в матрицу проекции
   glLoadIdentity; //—брасываем текущую матрицу
   glOrtho(-ClientWidth div 2,ClientWidth div 2,-ClientHeight div 2,ClientHeight div 2,-800,800);   //центровка в ноль по центру экрана
   glMatrixMode(GL_MODELVIEW);  // переходим в модельную матрицу
   glLoadIdentity; //—брасываем текущую матрицу
+  *)
 
 
   //gluOrtho2D(-ClientWidth div 2,ClientWidth div 2,-ClientHeight div 2,ClientHeight div 2);   //центровка в ноль по центру экрана*)
@@ -712,11 +714,20 @@ var  x,y:Integer;
   bmpInfo: BITMAP;
 begin x:=0; y:=0; Texture:=0;
   //glColor3f(1.0,0.0,0.0);
+  glClearColor (0, 0, 0, 1.0); //÷вет фона
   glClear (GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT or GL_COLOR_BUFFER_BIT); //ќчистка буфера цвета и глубины
+  //glLoadIdentity; //—брасываем текущую матрицу
+  glLoadIdentity();
+  glViewport(0,0,ClientWidth,ClientHeight);
 
   if Assigned(FCamera) then begin
-    SendMessage(FCamera,WM_3D_CAMERA_RENDER,nil,nil);
-    PostMessage(FCamera.Handle,WM_3D_CAMERA_RENDER,0,0);
+    FCamera.ApplayCamera(self);
+  end else begin
+    glMatrixMode(GL_PROJECTION); //переходим в матрицу проекции
+    glLoadIdentity; //—брасываем текущую матрицу
+    glOrtho(-ClientWidth div 2,ClientWidth div 2,-ClientHeight div 2,ClientHeight div 2,-800,800);   //центровка в ноль по центру экрана
+    glMatrixMode(GL_MODELVIEW);  // переходим в модельную матрицу
+    glLoadIdentity; //—брасываем текущую матрицу
   end;
 
   if Assigned(FOnBeforeRender) then begin
@@ -741,7 +752,7 @@ begin x:=0; y:=0; Texture:=0;
   //FPS:=Round(TTimeSpan.Subtract(GetTime,Self.CalcFPS).Milliseconds);
   //Self.CalcFPS:=GetTime;
   Self.CalculateFrameRate;
-  TextOut('Media Display ['+FormatDateTime('hh.mm.ss.zzz',Time)+'] FPS:'+FloatToStr(Self.CalcFPS{FPS}),-ClientWidth div 2 + 5,ClientHeight div 2 - 15,-128,11,0,0);
+  TextOut('Media Display ['+FormatDateTime('hh.mm.ss.zzz',Time)+'] FPS:'+FloatToStr(Self.CalcFPS{FPS})+' OpenGL:'+glGetString(GL_VERSION),-ClientWidth div 2 + 5,ClientHeight div 2 - 15,-128.0,11.0,0.0,0.5);
   if FDrawInfo then begin
     TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,GlobalTime))+'] Global',-ClientWidth div 2 + 5,ClientHeight div 2 - 30,1,0,1,0);
     TextOut('['+FormatDateTime('hh.mm.ss.zzz',IncMilliSecond(MinDateTime,PackTime))+'] Packed',-ClientWidth div 2 + 5,ClientHeight div 2 - 45,1,1,0,0);
