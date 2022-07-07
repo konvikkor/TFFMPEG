@@ -1,0 +1,48 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{9DE645B4-16B3-4477-BE5B-79FE6970F9A8}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="proj/FFMPEG.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="proj/TestVideo.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="FFMPEG">
+        <MSBuild Projects="FFMPEG.dproj"/>
+    </Target>
+    <Target Name="FFMPEG:Clean">
+        <MSBuild Projects="FFMPEG.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="FFMPEG:Make">
+        <MSBuild Projects="FFMPEG.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="TestVideo">
+        <MSBuild Projects="TestVideo.dproj"/>
+    </Target>
+    <Target Name="TestVideo:Clean">
+        <MSBuild Projects="TestVideo.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="TestVideo:Make">
+        <MSBuild Projects="TestVideo.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="FFMPEG;TestVideo"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="FFMPEG:Clean;TestVideo:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="FFMPEG:Make;TestVideo:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

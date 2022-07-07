@@ -3,10 +3,10 @@
         <ProjectGuid>{9DE645B4-16B3-4477-BE5B-79FE6970F9A8}</ProjectGuid>
     </PropertyGroup>
     <ItemGroup>
-        <Projects Include="FFMPEG.dproj">
+        <Projects Include="proj\FFMPEG.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="TestVideo.dproj">
+        <Projects Include="proj\TestVideo.dproj">
             <Dependencies/>
         </Projects>
     </ItemGroup>
@@ -18,22 +18,22 @@
         </BorlandProject>
     </ProjectExtensions>
     <Target Name="FFMPEG">
-        <MSBuild Projects="FFMPEG.dproj"/>
+        <MSBuild Projects="proj\FFMPEG.dproj"/>
     </Target>
     <Target Name="FFMPEG:Clean">
-        <MSBuild Projects="FFMPEG.dproj" Targets="Clean"/>
+        <MSBuild Projects="proj\FFMPEG.dproj" Targets="Clean"/>
     </Target>
     <Target Name="FFMPEG:Make">
-        <MSBuild Projects="FFMPEG.dproj" Targets="Make"/>
+        <MSBuild Projects="proj\FFMPEG.dproj" Targets="Make"/>
     </Target>
     <Target Name="TestVideo">
-        <MSBuild Projects="TestVideo.dproj"/>
+        <MSBuild Projects="proj\TestVideo.dproj"/>
     </Target>
     <Target Name="TestVideo:Clean">
-        <MSBuild Projects="TestVideo.dproj" Targets="Clean"/>
+        <MSBuild Projects="proj\TestVideo.dproj" Targets="Clean"/>
     </Target>
     <Target Name="TestVideo:Make">
-        <MSBuild Projects="TestVideo.dproj" Targets="Make"/>
+        <MSBuild Projects="proj\TestVideo.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
         <CallTarget Targets="FFMPEG;TestVideo"/>

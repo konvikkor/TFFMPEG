@@ -1,0 +1,276 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{D31FC50A-DE68-4BE5-9025-BC3B90AD3A12}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="avio_dir_cmd.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="avio_reading.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="decode_audio.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="decode_video.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="decoding_encoding.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="demuxing_decoding.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="encode_audio.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="encode_video.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="extract_mvs.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="ffmpeg_sample_player.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="filter_audio.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="filtering_audio.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="filtering_video.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="hw_decode.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="metadata.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="muxing.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="remuxing.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="resampling_audio.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="scaling_video.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="avio_reading\Project1.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="dump-frame\dumpframe.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="avio_dir_cmd">
+        <MSBuild Projects="avio_dir_cmd.dproj"/>
+    </Target>
+    <Target Name="avio_dir_cmd:Clean">
+        <MSBuild Projects="avio_dir_cmd.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="avio_dir_cmd:Make">
+        <MSBuild Projects="avio_dir_cmd.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="avio_reading">
+        <MSBuild Projects="avio_reading.dproj"/>
+    </Target>
+    <Target Name="avio_reading:Clean">
+        <MSBuild Projects="avio_reading.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="avio_reading:Make">
+        <MSBuild Projects="avio_reading.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="decode_audio">
+        <MSBuild Projects="decode_audio.dproj"/>
+    </Target>
+    <Target Name="decode_audio:Clean">
+        <MSBuild Projects="decode_audio.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="decode_audio:Make">
+        <MSBuild Projects="decode_audio.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="decode_video">
+        <MSBuild Projects="decode_video.dproj"/>
+    </Target>
+    <Target Name="decode_video:Clean">
+        <MSBuild Projects="decode_video.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="decode_video:Make">
+        <MSBuild Projects="decode_video.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="decoding_encoding">
+        <MSBuild Projects="decoding_encoding.dproj"/>
+    </Target>
+    <Target Name="decoding_encoding:Clean">
+        <MSBuild Projects="decoding_encoding.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="decoding_encoding:Make">
+        <MSBuild Projects="decoding_encoding.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="demuxing_decoding">
+        <MSBuild Projects="demuxing_decoding.dproj"/>
+    </Target>
+    <Target Name="demuxing_decoding:Clean">
+        <MSBuild Projects="demuxing_decoding.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="demuxing_decoding:Make">
+        <MSBuild Projects="demuxing_decoding.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="encode_audio">
+        <MSBuild Projects="encode_audio.dproj"/>
+    </Target>
+    <Target Name="encode_audio:Clean">
+        <MSBuild Projects="encode_audio.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="encode_audio:Make">
+        <MSBuild Projects="encode_audio.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="encode_video">
+        <MSBuild Projects="encode_video.dproj"/>
+    </Target>
+    <Target Name="encode_video:Clean">
+        <MSBuild Projects="encode_video.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="encode_video:Make">
+        <MSBuild Projects="encode_video.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="extract_mvs">
+        <MSBuild Projects="extract_mvs.dproj"/>
+    </Target>
+    <Target Name="extract_mvs:Clean">
+        <MSBuild Projects="extract_mvs.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="extract_mvs:Make">
+        <MSBuild Projects="extract_mvs.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="ffmpeg_sample_player">
+        <MSBuild Projects="ffmpeg_sample_player.dproj"/>
+    </Target>
+    <Target Name="ffmpeg_sample_player:Clean">
+        <MSBuild Projects="ffmpeg_sample_player.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ffmpeg_sample_player:Make">
+        <MSBuild Projects="ffmpeg_sample_player.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="filter_audio">
+        <MSBuild Projects="filter_audio.dproj"/>
+    </Target>
+    <Target Name="filter_audio:Clean">
+        <MSBuild Projects="filter_audio.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="filter_audio:Make">
+        <MSBuild Projects="filter_audio.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="filtering_audio">
+        <MSBuild Projects="filtering_audio.dproj"/>
+    </Target>
+    <Target Name="filtering_audio:Clean">
+        <MSBuild Projects="filtering_audio.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="filtering_audio:Make">
+        <MSBuild Projects="filtering_audio.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="filtering_video">
+        <MSBuild Projects="filtering_video.dproj"/>
+    </Target>
+    <Target Name="filtering_video:Clean">
+        <MSBuild Projects="filtering_video.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="filtering_video:Make">
+        <MSBuild Projects="filtering_video.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="hw_decode">
+        <MSBuild Projects="hw_decode.dproj"/>
+    </Target>
+    <Target Name="hw_decode:Clean">
+        <MSBuild Projects="hw_decode.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="hw_decode:Make">
+        <MSBuild Projects="hw_decode.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="metadata">
+        <MSBuild Projects="metadata.dproj"/>
+    </Target>
+    <Target Name="metadata:Clean">
+        <MSBuild Projects="metadata.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="metadata:Make">
+        <MSBuild Projects="metadata.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="muxing">
+        <MSBuild Projects="muxing.dproj"/>
+    </Target>
+    <Target Name="muxing:Clean">
+        <MSBuild Projects="muxing.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="muxing:Make">
+        <MSBuild Projects="muxing.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="remuxing">
+        <MSBuild Projects="remuxing.dproj"/>
+    </Target>
+    <Target Name="remuxing:Clean">
+        <MSBuild Projects="remuxing.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="remuxing:Make">
+        <MSBuild Projects="remuxing.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="resampling_audio">
+        <MSBuild Projects="resampling_audio.dproj"/>
+    </Target>
+    <Target Name="resampling_audio:Clean">
+        <MSBuild Projects="resampling_audio.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="resampling_audio:Make">
+        <MSBuild Projects="resampling_audio.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="scaling_video">
+        <MSBuild Projects="scaling_video.dproj"/>
+    </Target>
+    <Target Name="scaling_video:Clean">
+        <MSBuild Projects="scaling_video.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="scaling_video:Make">
+        <MSBuild Projects="scaling_video.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Project1">
+        <MSBuild Projects="avio_reading\Project1.dproj"/>
+    </Target>
+    <Target Name="Project1:Clean">
+        <MSBuild Projects="avio_reading\Project1.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="Project1:Make">
+        <MSBuild Projects="avio_reading\Project1.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="dumpframe">
+        <MSBuild Projects="dump-frame\dumpframe.dproj"/>
+    </Target>
+    <Target Name="dumpframe:Clean">
+        <MSBuild Projects="dump-frame\dumpframe.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="dumpframe:Make">
+        <MSBuild Projects="dump-frame\dumpframe.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="avio_dir_cmd;avio_reading;decode_audio;decode_video;decoding_encoding;demuxing_decoding;encode_audio;encode_video;extract_mvs;ffmpeg_sample_player;filter_audio;filtering_audio;filtering_video;hw_decode;metadata;muxing;remuxing;resampling_audio;scaling_video;Project1;dumpframe"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="avio_dir_cmd:Clean;avio_reading:Clean;decode_audio:Clean;decode_video:Clean;decoding_encoding:Clean;demuxing_decoding:Clean;encode_audio:Clean;encode_video:Clean;extract_mvs:Clean;ffmpeg_sample_player:Clean;filter_audio:Clean;filtering_audio:Clean;filtering_video:Clean;hw_decode:Clean;metadata:Clean;muxing:Clean;remuxing:Clean;resampling_audio:Clean;scaling_video:Clean;Project1:Clean;dumpframe:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="avio_dir_cmd:Make;avio_reading:Make;decode_audio:Make;decode_video:Make;decoding_encoding:Make;demuxing_decoding:Make;encode_audio:Make;encode_video:Make;extract_mvs:Make;ffmpeg_sample_player:Make;filter_audio:Make;filtering_audio:Make;filtering_video:Make;hw_decode:Make;metadata:Make;muxing:Make;remuxing:Make;resampling_audio:Make;scaling_video:Make;Project1:Make;dumpframe:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
