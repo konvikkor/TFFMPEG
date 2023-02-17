@@ -38,6 +38,11 @@ contains
   uMediaReader in '..\src\uMediaReader.pas',
   uVideoMain in '..\src\uVideoMain.pas',
   uVideoThread in '..\src\uVideoThread.pas',
-  u3DCamera in '..\src\u3DCamera.pas';
+  u3DCamera in '..\src\u3DCamera.pas',
+  SDL2 in '..\sdl2\SDL2.pas',
+  SDL2_Image in '..\sdl2\SDL2_Image.pas',
+  SDL2_Mixer in '..\sdl2\SDL2_Mixer.pas',
+  SDL2_Net in '..\sdl2\SDL2_Net.pas',
+  SDL2_Ttf in '..\sdl2\SDL2_Ttf.pas';
 
 end.
