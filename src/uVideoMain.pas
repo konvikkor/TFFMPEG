@@ -71,7 +71,7 @@ type
     procedure OnSyncTime(Sender:TObject;var GT:UInt64; Pack:PAVPacket; var Delay:Int64);
   public
     constructor Create(AOwner: TComponent); override;
-    destructor Destroy;
+    destructor Destroy; override;
     Function GetVideoStrem:PAVStream;
     function Start:Boolean;
     function Stop:Boolean;
@@ -117,7 +117,7 @@ end;
 { TMediaCore }
 
 function TMediaCore.CloseFile: Boolean;
-begin
+begin Result:=false;
   {for I := 0 to High(Steams)-1 do begin
    if Assigned(Steams[i].stream) then
     if Assigned(Steams[i].stream.codec) then begin
@@ -310,7 +310,7 @@ var
   iSeekFlag, ret: Integer;
   iSeekTarget: Int64;
   iSuccess: Integer;
-begin
+begin   result:= 0;
  iSeekTarget := ts*1000;
  try
   avcodec_flush_buffers(

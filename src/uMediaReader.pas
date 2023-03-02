@@ -18,6 +18,7 @@ uses
 
 type
 
+  {$M+}
   TMediaReader = class (TThread)
   private
     FOnIsPlayed: TOnIsPlayed;
