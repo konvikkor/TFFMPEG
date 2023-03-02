@@ -10,9 +10,7 @@ object Form1: TForm1
   Font.Height = -11
   Font.Name = 'Tahoma'
   Font.Style = []
-  OldCreateOrder = False
   PopupMenu = PopupMenu1
-  PixelsPerInch = 96
   TextHeight = 13
   object PageControl1: TPageControl
     Left = 0
@@ -22,6 +20,8 @@ object Form1: TForm1
     ActivePage = TabSheet2
     Align = alClient
     TabOrder = 0
+    ExplicitWidth = 586
+    ExplicitHeight = 373
     object TabSheet1: TTabSheet
       Caption = 'LOG'
       object Splitter1: TSplitter
@@ -95,6 +95,8 @@ object Form1: TForm1
         TabOrder = 0
         TickMarks = tmBoth
         TickStyle = tsNone
+        ExplicitTop = 319
+        ExplicitWidth = 578
       end
     end
     object TabSheet3: TTabSheet
@@ -123,6 +125,8 @@ object Form1: TForm1
       item
         Width = 50
       end>
+    ExplicitTop = 373
+    ExplicitWidth = 586
   end
   object PopupMenu1: TPopupMenu
     Left = 88

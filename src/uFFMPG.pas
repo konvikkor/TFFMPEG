@@ -52,7 +52,7 @@ type
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
-    Function DisplayFrame(var AVFrame: TAVFrame; AVStream: PAVStream; DeleyTime:Cardinal = 0): Boolean;
+    Function DisplayFrame(var AVFrame: AVFrame; AVStream: PAVStream; DeleyTime:Cardinal = 0): Boolean;
     Function DisplayInit(AVStream: PAVStream): Boolean;
     Function DisplayFree: Boolean;
     Procedure UpdateRender;
@@ -114,7 +114,7 @@ Type
     Class Function InitSize(w,h, DataSize:Int32):TBmpHead; Static;
   end;
 
-  TOnHookFrame = procedure (Frame:TAVFrame; Paket:TAVPacket; Steam:TAVStream)of object;
+  TOnHookFrame = procedure (Frame:AVFrame; Paket:AVPacket; Steam:AVStream)of object;
 
   TMyFFMpegCore = class (TComponent)
   private
@@ -128,7 +128,7 @@ Type
 
     FFMpedDisplay: TMyFFMpegDisplay;
     FormatContext: PAVFormatContext;
-    PixelFormat: TAVPixelFormat;
+    PixelFormat: AVPixelFormat;
     Steams: Array of TStream;
     video_stream_idx: Integer;
     //[Volatile]
@@ -143,8 +143,8 @@ Type
     CS:TCriticalSection;
   public
     [Volatile]
-    AVPacket: TAVPacket;
-    AVFrame:TAVFrame;
+    AVPacket: AVPacket;
+    AVFrame:AVFrame;
     function OpenFile(FileName:string):Boolean;
     Function CloseFile:Boolean;
     constructor Create(AOwner: TComponent); override;
@@ -178,7 +178,7 @@ Type
    Task:ITask;
   public
    class var MyDecodeThead:Pointer;//TThread;
-   Class Function SaveFrameAsBitmap(Frame:TAVFrame; Steam:TAVStream; var Pict: Vcl.Graphics.TBitmap):Boolean;
+   Class Function SaveFrameAsBitmap(Frame:AVFrame; Steam:AVStream; var Pict: Vcl.Graphics.TBitmap):Boolean;
    Procedure Play;
    Procedure Stop;
    function GetStatusPlay:Boolean;
@@ -190,9 +190,17 @@ Type
 
 procedure Register;
 
+function PPtrIdx(P: PPAVStream; I: integer): PAVStream;
+
 implementation
 
 uses uFFMpegThead;
+
+function PPtrIdx(P: PPAVStream; I: integer): PAVStream;
+begin
+  Inc(P, I);
+  Result := P^;
+end;
 
 procedure Register;
 begin
@@ -324,7 +332,7 @@ begin
   inherited;
 end;
 
-function TMyFFMpegDisplay.DisplayFrame(VAR AVFrame: TAVFrame;
+function TMyFFMpegDisplay.DisplayFrame(VAR AVFrame: AVFrame;
   AVStream: PAVStream; DeleyTime:Cardinal): Boolean;
 var
   res: SInt32;
@@ -332,7 +340,7 @@ var
   Img: PAVFrame;
   Ibmp_Size: Integer;
   ibmp_Buff: PByte;
-  pix_F: TAVPixelFormat;
+  pix_F: AVPixelFormat;
   rect2, rect3: TSDL_Rect;
   p: Real;
 
@@ -365,7 +373,7 @@ begin
     AVStream.codec.pix_fmt, rect2.W{AVStream.codec.width}, rect2.h{AVStream.codec.height}, pix_F, SWS_BILINEAR, nil,
     nil, nil);
   // Формируем буфер для картинки RGB
-  Ibmp_Size := avpicture_get_size(pix_F, rect2.w{AVStream.codec.width}, rect2.H{AVStream.codec.height});
+  Ibmp_Size := av_image_get_buffer_size(pix_F, rect2.w{AVStream.codec.width}, rect2.H{AVStream.codec.height},0);
   ibmp_Buff := nil;
   ibmp_Buff := av_malloc(Ibmp_Size * SizeOf(Byte));
   res := avpicture_fill(PAVPicture(Img), ibmp_Buff, pix_F, rect2.w{AVStream.codec.width},
@@ -414,7 +422,11 @@ begin
   //av_freep(ibmp_Buff);
   sws_freeContext(ImgConvContext);
   //av_frame_unref(@Img);
-  av_frame_free(@Img);
+
+  /////////////////////////////////////////////////////////////////////////////
+  ///
+  ///  ////////////////////////////////////////////////////////////////////////
+  av_frame_free(Img);
   Application.ProcessMessages;
   SDL_RenderPresent(FSDLPantalla^.Renderer);
  end;
@@ -496,7 +508,7 @@ end;
 
 function TMyFFMpegCore.CloseFile: Boolean;
 begin
- avformat_close_input(@FormatContext);
+ avformat_close_input(FormatContext);
 end;
 
 constructor TMyFFMpegCore.Create(AOwner: TComponent);
@@ -520,7 +532,8 @@ begin
   //if not Assigned(frame) then Frame := av_frame_alloc();
   (* decode video frame *)
   TicB:=GetTickCount;
-  ret := avcodec_decode_video2(Steams[SteamID].stream^.codec, @AVFrame{@frame}, got_frame, @AVPacket);
+  ret := avcodec_receive_frame(Steams[SteamID].stream^.codec, @AVFrame{@frame});
+  (*ret := avcodec_decode_video2(Steams[SteamID].stream^.codec, @AVFrame{@frame}, got_frame, @AVPacket);*)
   if ret < 0 then
   begin
     Result := ret;
@@ -593,17 +606,15 @@ begin Result:=False; opts:=nil;
  VideoFile:=PAnsiChar(tmp);
  try
   { * open input file, and allocate format context * }
-  ret := avformat_open_input(@FormatContext, VideoFile, nil, nil);
-  if ret < 0 then
-    raise Exception.Create('Error Message:Could not open source file "' + FileName+'"'+sLineBreak+av_err2str(ret));
+  ret := avformat_open_input(FormatContext, VideoFile, nil, nil);
+  if ret < 0 then raise Exception.Create('Error Message:Could not open source file "' + FileName+'"'+sLineBreak+av_err2str(ret));
   (* retrieve stream information *)
   ret := avformat_find_stream_info(FormatContext, nil);
-  if ret < 0 then
-    raise Exception.Create('Error Message:Could not find stream information' + sLineBreak + av_err2str(ret));
+  if ret < 0 then raise Exception.Create('Error Message:Could not find stream information' + sLineBreak + av_err2str(ret));
   // Dump information about file onto standard error
   av_dump_format(FormatContext, 0, VideoFile, 0);
   {* Поиск основного потока видео *}
-  ret := av_find_best_stream(FormatContext, AVMEDIA_TYPE_VIDEO, -1, -1, nil, 0);
+  ret := av_find_best_stream(@FormatContext, AVMEDIA_TYPE_VIDEO, -1, -1, avdec, 0);
   if ret < 0 then
     raise Exception.Create('Error Message:Could not find ' +
       string(av_get_media_type_string(AVMEDIA_TYPE_VIDEO)) + ' stream in input file ''' +
@@ -752,7 +763,8 @@ begin
    exit;
   end;
   TicB:=GetTickCount;
-  ret := avcodec_decode_video2(Steams[AVPacket.stream_index].stream^.codec, @AVFrame{@frame}, got_frame, @AVPacket);
+  ret := avcodec_receive_frame(Steams[AVPacket.stream_index].stream^.codec, @AVFrame{@frame});
+  (*ret := avcodec_decode_video2(Steams[AVPacket.stream_index].stream^.codec, @AVFrame{@frame}, got_frame, @AVPacket);*)
   if ret < 0 then
   begin
     Deley := ret;
@@ -846,7 +858,7 @@ begin
   if not TMyDecodeThead(Self.MyDecodeThead).Started then TMyDecodeThead(Self.MyDecodeThead).Start;
 end;
 
-class function TMyFFMpeg.SaveFrameAsBitmap(Frame: TAVFrame;  Steam:TAVStream;
+class function TMyFFMpeg.SaveFrameAsBitmap(Frame: AVFrame;  Steam:AVStream;
   var Pict: Vcl.Graphics.TBitmap): Boolean;
 var
   res: SInt32;
@@ -854,7 +866,7 @@ var
   Img: PAVFrame;
   Ibmp_Size: Integer;
   ibmp_Buff: PByte;
-  pix_F: TAVPixelFormat;
+  pix_F: AVPixelFormat;
 
   TmpData:Pointer;
   FileLine:TArray<Byte>;
@@ -921,7 +933,7 @@ begin Result := False;
   // очистка памяти от временного мусора
   av_free(ibmp_Buff);
   sws_freeContext(ImgConvContext);
-  av_frame_free(@Img);
+  av_frame_free(Img);
   Application.ProcessMessages;
  end;
 end;

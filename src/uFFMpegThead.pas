@@ -8,19 +8,9 @@ uses
 
   Vcl.ExtCtrls,Math,System.SyncObjs,
 
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, FFTypes, FFUtils, System.DateUtils,
-  libavcodec, libavcodec_avfft, libavdevice, libavfilter, libavfilter_avcodec,
-  libavfilter_buffersink, libavfilter_buffersrc, libavfilter_formats,
-  libavformat, libavformat_avio, libavformat_url, libavutil,
-  libavutil_audio_fifo, libavutil_avstring, libavutil_bprint, libavutil_buffer,
-  libavutil_channel_layout, libavutil_common, libavutil_cpu, libavutil_dict,
-  libavutil_display, libavutil_error, libavutil_eval, libavutil_fifo,
-  libavutil_file, libavutil_frame, libavutil_imgutils, libavutil_log,
-  libavutil_mathematics, libavutil_md5, libavutil_mem, libavutil_motion_vector,
-  libavutil_opt, libavutil_parseutils, libavutil_pixdesc, libavutil_pixfmt,
-  libavutil_rational, libavutil_samplefmt, libavutil_time, libavutil_timestamp,
-  libswresample, libswscale, sdl2, {sdl, {uResourcePaths,} System.Threading,
-  uFFmpg;
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, ffmpeg_types, System.DateUtils,
+  libavcodec, libavdevice, libavfilter, libavformat, libavutil, libswresample,
+  libswscale, sdl2, {sdl, {uResourcePaths,} System.Threading, uFFmpg;
 
 type
   TOnStatusThead = procedure (var PlayStop:Boolean; var Close:Boolean) of object;
@@ -31,7 +21,7 @@ type
   TOnRunVIDEO    = procedure (var Deley:Cardinal) of object;
   TOnRunAUDIO    = procedure (var Deley:Cardinal) of object;
   TOnDelay       = procedure (var TotalDelay:Cardinal)of object;
-  TOnHookFrame = procedure (Frame:TAVFrame; Paket:TAVPacket; Steam:TAVStream)of object;
+  TOnHookFrame = procedure (Frame:AVFrame; Paket:AVPacket; Steam:AVStream)of object;
 
   TMyDecodeThead = class (TThread)
   private

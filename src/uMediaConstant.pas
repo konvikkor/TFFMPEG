@@ -65,7 +65,7 @@ type
     FBuffer:TArray<Pointer>;
   public
     constructor Create(Size:Cardinal = 500);
-    destructor Destroy;
+    destructor Destroy; override;
     Function WriteData(var Item:Pointer):Cardinal;
     Function ReadData(var Item:Pointer):Cardinal;
     Function GetCount:Cardinal;

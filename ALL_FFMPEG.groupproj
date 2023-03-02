@@ -6,7 +6,7 @@
         <Projects Include="proj\FFMPEG.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="proj\TestVideo.dproj">
+        <Projects Include="proj\testVideo.dproj">
             <Dependencies/>
         </Projects>
     </ItemGroup>
@@ -26,23 +26,23 @@
     <Target Name="FFMPEG:Make">
         <MSBuild Projects="proj\FFMPEG.dproj" Targets="Make"/>
     </Target>
-    <Target Name="TestVideo">
-        <MSBuild Projects="proj\TestVideo.dproj"/>
+    <Target Name="testVideo">
+        <MSBuild Projects="proj\testVideo.dproj"/>
     </Target>
-    <Target Name="TestVideo:Clean">
-        <MSBuild Projects="proj\TestVideo.dproj" Targets="Clean"/>
+    <Target Name="testVideo:Clean">
+        <MSBuild Projects="proj\testVideo.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="TestVideo:Make">
-        <MSBuild Projects="proj\TestVideo.dproj" Targets="Make"/>
+    <Target Name="testVideo:Make">
+        <MSBuild Projects="proj\testVideo.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
-        <CallTarget Targets="FFMPEG;TestVideo"/>
+        <CallTarget Targets="FFMPEG;testVideo"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="FFMPEG:Clean;TestVideo:Clean"/>
+        <CallTarget Targets="FFMPEG:Clean;testVideo:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="FFMPEG:Make;TestVideo:Make"/>
+        <CallTarget Targets="FFMPEG:Make;testVideo:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

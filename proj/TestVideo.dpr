@@ -1,14 +1,17 @@
-program TestVideo;
+program testVideo;
 
 uses
   Vcl.Forms,
-  uTestMain in '../src/uTestMain.pas' {Form1},
-  uVideoMain in '../src/uVideoMain.pas',
-  uMediaDisplay in '../src/uMediaDisplay.pas',
-  uMediaConstant in '../src/uMediaConstant.pas',
-  uVideoThread in '../src/uVideoThread.pas',
-  uMediaReader in '../src/uMediaReader.pas',
-  uMediaTimeLine in '../src/uMediaTimeLine.pas';
+  u3DCamera in '..\src\u3DCamera.pas',
+  uFFMpegThead in '..\src\uFFMpegThead.pas',
+  uFFMPG in '..\src\uFFMPG.pas',
+  uMediaConstant in '..\src\uMediaConstant.pas',
+  uMediaDisplay in '..\src\uMediaDisplay.pas',
+  uMediaReader in '..\src\uMediaReader.pas',
+  uMediaTimeLine in '..\src\uMediaTimeLine.pas',
+  uVideoMain in '..\src\uVideoMain.pas',
+  uVideoThread in '..\src\uVideoThread.pas',
+  uTestMain in '..\src\uTestMain.pas' {Form1};
 
 {$R *.res}
 
