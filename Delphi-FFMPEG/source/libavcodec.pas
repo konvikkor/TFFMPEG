@@ -1,5 +1,6 @@
 unit libavcodec;
-
+
+
 {$IFDEF FPC}
 {$MODE Delphi}
 {$ENDIF}
@@ -6782,4 +6783,4 @@ function av_dirac_parse_sequence_header(var dsh: pAVDiracSeqHeader; const buf: p
 implementation
 
 end.
-
+
