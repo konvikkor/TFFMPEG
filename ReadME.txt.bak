@@ -24,3 +24,18 @@ On the msys2 window execute "which cl" and you should see the path of your VS
 Execute "which link" and you should also see the path of your VS
 Go to the ffmpeg source path (eg.: "cd /c/ffmpeg3.3")
 Run ./configure and make
+
+
+D:\+MyProjects\FFmpeg\
+./configure \
+    --toolchain=msvc \
+    --arch=x86_64 \
+    --enable-yasm \
+    --enable-asm\
+    --enable-shared \
+    --enable-w32threads \
+    --disable-programs \
+    --disable-ffserver \
+    --disable-doc \
+    --disable-static \
+    --prefix=/d/+MyProjects/TFFMPEG/out/Win64

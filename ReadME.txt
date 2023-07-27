@@ -35,7 +35,6 @@ D:\+MyProjects\FFmpeg\
     --enable-shared \
     --enable-w32threads \
     --disable-programs \
-    --disable-ffserver \
     --disable-doc \
     --disable-static \
     --prefix=/d/+MyProjects/TFFMPEG/out/Win64
