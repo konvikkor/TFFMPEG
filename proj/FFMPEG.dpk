@@ -31,7 +31,7 @@ requires
   rtl;
 
 contains
-  uFFMPEG.context in '..\src\uFFMPEG.context.pas',
-  ArrayHelper in '..\src\ArrayHelper.pas';
+  ArrayHelper in '..\plugin\ArrayHelper.pas',
+  uFFMPEG.context in '..\src\uFFMPEG.context.pas';
 
 end.
